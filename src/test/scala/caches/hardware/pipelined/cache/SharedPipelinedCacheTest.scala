@@ -55,6 +55,8 @@ case class CacheConfiguration(
                                nHalfMissCmds: Option[Int] = None
                              )
 
+case class Dut(dutGen: () => SharedPipelinedCacheTestTop, nCores: Int, tagWidth: Int, indexWidth: Int, blockOffsetWidth: Int, byteOffsetWidth: Int)
+
 case class BitPlruConfiguration() extends PolicyConfiguration
 
 case class TreePlruConfiguration() extends PolicyConfiguration
@@ -264,7 +266,9 @@ object Tests {
     CacheRequest(coreId = 3, reqId = 22, tag = 42, index = 73, blockOffset = 3, rw = false, expectedData = Some("763453aa42df7d92956636a260ab9d3b")), // MISS, way: 1
     CacheRequest(coreId = 2, reqId = 23, tag = 43, index = 73, blockOffset = 2, rw = false, expectedData = Some("8ce6a0927f254495140145d97c73d99b")), // MISS, way: 2, expect the critical request to enter the critical queue
     CacheRequest(coreId = 3, reqId = 24, tag = 43, index = 73, blockOffset = 0, rw = false, expectedData = Some("1166cabd710071a9c992e051ec16c43d")), // HALF-MISS, see if a non-critical request can be added as a half miss
-    // TODO: Unset the cores as critical to see if we get a response
+    PerformSchedulerOperation(2, false),
+    Stall(50),
+    ExpectFinishedRejectedResponse(coreId = 0, reqId = 20, expectedData = "799773662e941d07b4340bdff6f72ec1")
   )
 
   // Test actions for a miss queue full of half misses
@@ -373,16 +377,16 @@ object Tests {
     CacheRequest(coreId = 2, reqId = 6, tag = 60, index = 74, blockOffset = 3, rw = false, expectedData = Some("73b0278b6f36d7c8306be31e40beb1d6")), // HIT, way: 0, precedent event
     CacheRequest(coreId = 1, reqId = 7, tag = 54, index = 74, blockOffset = 0, rw = false, expectedData = Some("df40715150c3cdeb41342d9956c84263")), // HIT, way: 0, precedent event
     CacheRequest(coreId = 1, reqId = 8, tag = 47, index = 74, blockOffset = 1, rw = false, expectedData = Some("8bc9e5b16e398f2a0ad9d36219c0a11d")), // MISS, way: 6,
-    CacheRequest(coreId = 2, reqId = 9, tag = 43, index = 74, blockOffset = 0, rw = false, expectedData = Some("bb8f359304bfc5ad924f17cfe23dd1e1")), // MISS, way: 7, 2 wb events
-    CacheRequest(coreId = 1, reqId = 10, tag = 12, index = 74, blockOffset = 2, rw = false, expectedData = Some("27dc8a4a3c648e0f23e4cfb1207fb2ec")), // MISS, way: 0, evict non-critical line, cause wb, 2 wb events
-    CacheRequest(coreId = 2, reqId = 11, tag = 18, index = 74, blockOffset = 0, rw = false, expectedData = Some("c70d484dfb1674c75d14d293ce30ec7c")), // MISS, way: 1, evict non-critical line, cause wb
-    CacheRequest(coreId = 0, reqId = 12, tag = 21, index = 74, blockOffset = 1, rw = false, expectedData = Some("efc887ce8779c45512b89afb7423b4d5")), // MISS, way: 2, contention event, reach contention limit for core 2
-    CacheRequest(coreId = 3, reqId = 13, tag = 39, index = 74, blockOffset = 3, rw = false, expectedData = Some("b638aaa4ef343eee6a4757cb65a2f78c")), // MISS, way: 3, contention event, critical wb, reach contention limit for core 1
-    CacheRequest(coreId = 1, reqId = 14, tag = 57, index = 74, blockOffset = 1, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000111100000000")), // MISS, way: 2,
+    CacheRequest(coreId = 2, reqId = 9, tag = 43, index = 74, blockOffset = 0, rw = false, expectedData = Some("bb8f359304bfc5ad924f17cfe23dd1e1")), // MISS, way: 7,
+    CacheRequest(coreId = 1, reqId = 10, tag = 12, index = 74, blockOffset = 2, rw = false, expectedData = Some("27dc8a4a3c648e0f23e4cfb1207fb2ec")), // MISS, way: 0, evict non-critical line, cause wb
+    CacheRequest(coreId = 2, reqId = 11, tag = 18, index = 74, blockOffset = 0, rw = false, expectedData = Some("c70d484dfb1674c75d14d293ce30ec7c")), // MISS, way: 1, evict non-critical line, cause wb, 1 wb event
+    CacheRequest(coreId = 2, reqId = 12, tag = 21, index = 74, blockOffset = 1, rw = false, expectedData = Some("efc887ce8779c45512b89afb7423b4d5")), // MISS, way: 2, 2 wb events, reach contention for core 2
+    CacheRequest(coreId = 3, reqId = 13, tag = 39, index = 74, blockOffset = 3, rw = false, expectedData = Some("b638aaa4ef343eee6a4757cb65a2f78c")), // MISS, way: 3, contention event, critical wb
+    CacheRequest(coreId = 1, reqId = 14, tag = 57, index = 74, blockOffset = 1, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000111100000000")), // MISS, way: 6, mim and eviction event, reach contention for core 1
     CacheRequest(coreId = 2, reqId = 15, tag = 41, index = 74, blockOffset = 1, rw = false, expectedData = Some("8f2a3009871c1b8fb22ed80f63229d0f")), // MISS, way: 3,
-    CacheRequest(coreId = 0, reqId = 16, tag = 41, index = 72, blockOffset = 1, rw = false, expectedData = Some("abbd90af6dbb29366ec5bd141df45023")), // MISS, way: 0,
-    CacheRequest(coreId = 1, reqId = 17, tag = 41, index = 72, blockOffset = 0, rw = false, expectedData = Some("a64a45812e63b4001eafac68edee5dd6")), // MISS, way: 1, not a half-miss since the core reached contention limit
-    CacheRequest(coreId = 2, reqId = 18, tag = 41, index = 72, blockOffset = 2, rw = false, expectedData = Some("b1a10cf29e0b684ae2dd8277b34d19f1")), // MISS, way: 2, not a half-miss since the core reached contention limit
+    CacheRequest(coreId = 0, reqId = 16, tag = 41, index = 72, blockOffset = 1, rw = false, expectedData = Some("abbd90af6dbb29366ec5bd141df45023")), // MISS, way: 0, not rejected since different index
+    CacheRequest(coreId = 1, reqId = 17, tag = 41, index = 72, blockOffset = 0, rw = false, expectedData = Some("a64a45812e63b4001eafac68edee5dd6")), // HALF-MISS, way: 1
+    CacheRequest(coreId = 2, reqId = 18, tag = 41, index = 72, blockOffset = 2, rw = false, expectedData = Some("b1a10cf29e0b684ae2dd8277b34d19f1")), // HALF-MISS, way: 2
     CacheRequest(coreId = 0, reqId = 19, tag = 8, index = 74, blockOffset = 0, rw = false, expectedData = Some("e83fb23952953ff164bdb8d5685d2bd3"), rejected = true), // MISS, way: rejected
     Stall(100),
     CacheRequest(coreId = 1, reqId = 20, tag = 57, index = 74, blockOffset = 2, rw = false, expectedData = Some("26f4756810b9c7b7fc87a234ac62fee6")), // HIT,
@@ -390,6 +394,62 @@ object Tests {
     PerformSchedulerOperation(2, false),
     CacheRequest(coreId = 1, reqId = 21, tag = 57, index = 74, blockOffset = 1, rw = false, expectedData = Some("60874082deadbeefa97a1896ff0b1476")),
     ExpectFinishedRejectedResponse(coreId = 0, reqId = 19, expectedData = "e83fb23952953ff164bdb8d5685d2bd3"),
+  )
+
+  val testActions9: Array[TestAction] = Array(
+    CacheRequest(coreId = 0, reqId = 0, tag = 60, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000000001111")), // MISS, way: 0
+    CacheRequest(coreId = 1, reqId = 1, tag = 61, index = 51, blockOffset = 1, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000011110000")), // MISS, way: 1
+    CacheRequest(coreId = 2, reqId = 2, tag = 62, index = 51, blockOffset = 2, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000111100000000")), // MISS, way: 2
+    CacheRequest(coreId = 3, reqId = 3, tag = 63, index = 51, blockOffset = 3, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b1111000000000000")), // MISS, way: 3
+    CacheRequest(coreId = 0, reqId = 4, tag = 64, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000000001111")), // MISS, way: 4
+    CacheRequest(coreId = 1, reqId = 5, tag = 65, index = 51, blockOffset = 1, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000011110000")), // MISS, way: 5
+    CacheRequest(coreId = 2, reqId = 6, tag = 66, index = 51, blockOffset = 2, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000111100000000")), // MISS, way: 6
+    CacheRequest(coreId = 3, reqId = 7, tag = 67, index = 51, blockOffset = 3, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b1111000000000000")), // MISS, way: 7
+    Stall(200), // Wait until all the data is brought into the cache
+    CacheRequest(coreId = 0, reqId = 8, tag = 68, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b1111000000000000")), // MISS, way: 0
+    CacheRequest(coreId = 1, reqId = 9, tag = 60, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000011110000")), // MISS, way: 1
+    CacheRequest(coreId = 2, reqId = 10, tag = 60, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000111100000000")), // HALF-MISS, way: 1
+    CacheRequest(coreId = 3, reqId = 11, tag = 60, index = 51, blockOffset = 0, rw = true, wData = Some("hcafebabecafebabecafebabecafebabe"), byteEn = Some("b1111000000000000")), // HALF-MISS, way: 1
+    CacheRequest(coreId = 0, reqId = 12, tag = 61, index = 51, blockOffset = 1, rw = false, expectedData = Some("d577c0716387d335deadbeefa43048c8")), // MISS, way: 2
+    CacheRequest(coreId = 1, reqId = 13, tag = 62, index = 51, blockOffset = 2, rw = false, expectedData = Some("04864642deadbeef864612cf4309b4a3")), // MISS, way: 3
+    CacheRequest(coreId = 2, reqId = 14, tag = 63, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef708879704d1bd26832e52d44")), // MISS, way: 4
+    CacheRequest(coreId = 3, reqId = 15, tag = 64, index = 51, blockOffset = 0, rw = false, expectedData = Some("7f7dc81bd798aa6eabd7c90fdeadbeef")), // MISS, way: 5
+    CacheRequest(coreId = 0, reqId = 16, tag = 65, index = 51, blockOffset = 1, rw = false, expectedData = Some("0ad39f3c41219d7bdeadbeef5596fcfc")), // MISS, way: 6
+    Stall(330),
+    CacheRequest(coreId = 1, reqId = 17, tag = 66, index = 51, blockOffset = 2, rw = false, expectedData = Some("df8dbf84deadbeef5572df5157b7c176")), // MISS, way: 0 *
+    CacheRequest(coreId = 2, reqId = 18, tag = 60, index = 51, blockOffset = 0, rw = false, expectedData = Some("cafebabedeadbeefdeadbeefdeadbeef")), // HIT, way: 1 *
+    CacheRequest(coreId = 3, reqId = 19, tag = 61, index = 51, blockOffset = 1, rw = false, expectedData = Some("d577c0716387d335deadbeefa43048c8")), // HIT, way: 2
+    CacheRequest(coreId = 0, reqId = 20, tag = 62, index = 51, blockOffset = 2, rw = false, expectedData = Some("04864642deadbeef864612cf4309b4a3")), // HIT, way: 3
+    CacheRequest(coreId = 1, reqId = 21, tag = 63, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef708879704d1bd26832e52d44")), // HIT, way: 4
+    CacheRequest(coreId = 2, reqId = 22, tag = 64, index = 51, blockOffset = 0, rw = false, expectedData = Some("7f7dc81bd798aa6eabd7c90fdeadbeef")), // HIT, way: 5
+    CacheRequest(coreId = 3, reqId = 23, tag = 65, index = 51, blockOffset = 1, rw = false, expectedData = Some("0ad39f3c41219d7bdeadbeef5596fcfc")), // HIT, way: 6
+    CacheRequest(coreId = 3, reqId = 24, tag = 67, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef3f17911b3db7e6a0a19f928d")), // HIT, way: 7
+    CacheRequest(coreId = 0, reqId = 25, tag = 69, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000011110000")), // MISS, way: 0
+    CacheRequest(coreId = 1, reqId = 26, tag = 68, index = 51, blockOffset = 0, rw = false, expectedData = Some("deadbeef2d21428029c70c78c255cab6")), // MISS, way: 1 *
+    CacheRequest(coreId = 2, reqId = 27, tag = 70, index = 51, blockOffset = 0, rw = true, wData = Some("hcafebabecafebabecafebabecafebabe"), byteEn = Some("b0000111100000000")), // MISS, way: 2
+    CacheRequest(coreId = 0, reqId = 28, tag = 62, index = 51, blockOffset = 2, rw = false, expectedData = Some("04864642deadbeef864612cf4309b4a3")), // HIT, way: 3
+    CacheRequest(coreId = 1, reqId = 29, tag = 63, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef708879704d1bd26832e52d44")), // HIT, way: 4
+    CacheRequest(coreId = 2, reqId = 30, tag = 64, index = 51, blockOffset = 0, rw = false, expectedData = Some("7f7dc81bd798aa6eabd7c90fdeadbeef")), // HIT, way: 5
+    CacheRequest(coreId = 3, reqId = 31, tag = 65, index = 51, blockOffset = 1, rw = false, expectedData = Some("0ad39f3c41219d7bdeadbeef5596fcfc")), // HIT, way: 6
+    CacheRequest(coreId = 3, reqId = 32, tag = 67, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef3f17911b3db7e6a0a19f928d")), // HIT, way: 7
+    Stall(120),
+    CacheRequest(coreId = 0, reqId = 33, tag = 69, index = 51, blockOffset = 0, rw = false, expectedData = Some("e7378b7ddf2a00e0deadbeefadc1c69d")), // HIT, way: 0 *
+    CacheRequest(coreId = 1, reqId = 34, tag = 68, index = 51, blockOffset = 0, rw = false, expectedData = Some("deadbeef2d21428029c70c78c255cab6")), // HIT, way: 1
+    CacheRequest(coreId = 2, reqId = 35, tag = 71, index = 51, blockOffset = 0, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b0000000011110000")), // MISS, way: 2
+    Stall(60),
+    CacheRequest(coreId = 3, reqId = 36, tag = 70, index = 51, blockOffset = 0, rw = false, expectedData = Some("6503d903cafebabe92e1c1015ed1d320")), // MISS, way: 3 *
+    CacheRequest(coreId = 0, reqId = 37, tag = 71, index = 51, blockOffset = 0, rw = false, expectedData = Some("e143e293836ac3e3deadbeef92c8bbbe")), // HIT, way: 2 *
+    Stall(60),
+    CacheRequest(coreId = 1, reqId = 38, tag = 69, index = 51, blockOffset = 1, rw = true, wData = Some("hdeadbeefdeadbeefdeadbeefdeadbeef"), byteEn = Some("b1111000000000000")), // HIT, way: 0
+    CacheRequest(coreId = 2, reqId = 39, tag = 68, index = 51, blockOffset = 0, rw = false, expectedData = Some("deadbeef2d21428029c70c78c255cab6")), // HIT, way: 1
+    CacheRequest(coreId = 3, reqId = 40, tag = 70, index = 51, blockOffset = 0, rw = false, expectedData = Some("6503d903cafebabe92e1c1015ed1d320")), // HIT, way: 3
+    CacheRequest(coreId = 0, reqId = 41, tag = 63, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef708879704d1bd26832e52d44")), // HIT, way: 4
+    CacheRequest(coreId = 1, reqId = 42, tag = 64, index = 51, blockOffset = 0, rw = false, expectedData = Some("7f7dc81bd798aa6eabd7c90fdeadbeef")), // HIT, way: 5
+    CacheRequest(coreId = 2, reqId = 43, tag = 65, index = 51, blockOffset = 1, rw = false, expectedData = Some("0ad39f3c41219d7bdeadbeef5596fcfc")), // HIT, way: 6
+    CacheRequest(coreId = 3, reqId = 44, tag = 67, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef3f17911b3db7e6a0a19f928d")), // HIT, way: 7
+    CacheRequest(coreId = 0, reqId = 45, tag = 72, index = 51, blockOffset = 2, rw = false, expectedData = Some("a7dd374354aafffed70ed97ed77322b5")), // MISS, way: 0 *
+    CacheRequest(coreId = 1, reqId = 46, tag = 69, index = 51, blockOffset = 1, rw = false, expectedData = Some("deadbeefbf622032026a1da9617116da")), // MISS, way: 1
+    // TODO: Add a test case in here, for when a memory interface pops an entry from miss-Q and at the same time a half miss is in the last REP stage
   )
 }
 
@@ -506,7 +566,7 @@ object SharedPipelinedCacheTest {
 
   val PRINT_INFO = true
 
-  def generateDut(cacheConfig: CacheConfiguration): (() => SharedPipelinedCacheTestTop, Int, Int, Int, Int) = {
+  def generateDut(cacheConfig: CacheConfiguration): Dut = {
     val nSets = cacheConfig.sizeInBytes / (cacheConfig.nWays * cacheConfig.bytesPerBlock)
 
     val l2RepPolicy = generateReplacementPolicy(
@@ -520,6 +580,7 @@ object SharedPipelinedCacheTest {
     val indexWidth = log2Up(nSets)
     val blockOffsetWidth = log2Up(cacheConfig.bytesPerBlock / cacheConfig.bytesPerSubBlock)
     val byteOffsetWidth = log2Up(cacheConfig.bytesPerSubBlock)
+    val tagWidth = cacheConfig.addressWidth - indexWidth - blockOffsetWidth - byteOffsetWidth
 
     val cacheGenFun = () => new SharedPipelinedCacheTestTop(
       sizeInBytes = cacheConfig.sizeInBytes,
@@ -536,7 +597,7 @@ object SharedPipelinedCacheTest {
       nHalfMissCmds = cacheConfig.nHalfMissCmds
     )
 
-    (cacheGenFun, cacheConfig.nCores, indexWidth, blockOffsetWidth, byteOffsetWidth)
+    Dut(cacheGenFun, cacheConfig.nCores, tagWidth, indexWidth, blockOffsetWidth, byteOffsetWidth)
   }
 
   def generateReplacementPolicy(policyConfig: PolicyConfiguration, nWays: Int, nSets: Int, nCores: Int, repSetFormat: Option[BaseReplacementSetFormat]): () => SharedCacheReplacementPolicyType = {
@@ -622,6 +683,11 @@ object SharedPipelinedCacheTest {
       case ExpectFinishedRejectedResponse(_, _, _) => true
       case _ => false
     }
+
+    // TODO: Group all requests by core ID, and issue request for each core at a same time,
+    //  do not issue more requests for the same core if did not receive a response,
+    //  add dependency for PerformSchedulerOperation action so it only executes it after a response to some
+    //  request has been received
 
     while (currentCC < maxCCs && receivedResponseCnt != expectedRespCnt) {
 

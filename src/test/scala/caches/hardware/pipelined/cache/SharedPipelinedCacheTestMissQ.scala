@@ -8,22 +8,22 @@ class SharedPipelinedCacheTestMissQ extends AnyFlatSpec with ChiselScalatestTest
   "SharedPipelinedCache" should "work with miss-q and precedent events for 8 ways and 128 sets" in {
     val cache = generateDut(CacheConfigs.config64ContMimPrec)
 
-    test(cache._1.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation)) { dut =>
-      defaultAssignments(dut, cache._2)
+    test(cache.dutGen.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation)) { dut =>
+      defaultAssignments(dut, cache.nCores)
 
       // Issue the first set of requests
       performTestActions(
         dut,
-        cache._2,
+        cache.nCores,
         Tests.testActions4,
-        cache._3,
-        cache._4,
-        cache._5,
-        500,
+        cache.indexWidth,
+        cache.blockOffsetWidth,
+        cache.byteOffsetWidth,
+        1000,
         printResults = PRINT_RESULTS
       )
 
-      dut.clock.step(1)
+      dut.clock.step()
     }
   }
 }

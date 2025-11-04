@@ -12,7 +12,6 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
   def defaultAssignments(dut: MissFifo): Unit = {
     dut.io.push.pushReq.poke(false.B)
     dut.io.pushCrit.poke(false.B)
-    dut.io.push.withCmd.poke(false.B)
     dut.io.push.pushReqEntry.tag.poke(0.U)
     dut.io.push.pushReqEntry.index.poke(0.U)
     dut.io.push.pushReqEntry.byteEn.poke(0.U) // All bytes disabled
@@ -39,7 +38,6 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
   def pushReq(
                dut: MissFifo,
-               withCmd: Boolean,
                tag: Int,
                index: Int,
                byteEn: Int,
@@ -50,7 +48,6 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
              ): Unit = {
     // Push an entry
     dut.io.push.pushReq.poke(true.B)
-    dut.io.push.withCmd.poke(withCmd.B)
     dut.io.push.pushReqEntry.tag.poke(tag.U)
     dut.io.push.pushReqEntry.index.poke(index.U)
     dut.io.push.pushReqEntry.byteEn.poke(byteEn.U)
@@ -70,7 +67,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
   def assertFifoCapacity(dut: MissFifo, full: Boolean, empty: Boolean, crit: Boolean = false): Unit = {
     dut.io.full.expect(full.B)
-    if(crit) {
+    if (crit) {
       dut.io.critEmpty.expect(empty.B)
     } else {
       dut.io.nonCritEmpty.expect(empty.B)
@@ -87,10 +84,10 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   def assertMshrStatusCritQueue(dut: MissFifo, crit: Boolean, expectedStatus: ExpectedMshrStatus): Unit = {
-    if(crit) {
+    if (crit) {
       val currentTags = dut.io.critInfo.currentTags
       val currentIndexes = dut.io.critInfo.currentIndexes
-      val validMSHRs = dut.io.critInfo.validMSHRs
+      val validMSHRs = dut.io.critInfo.validMshrs
       val fullSignals = dut.io.critInfo.fullCmds
 
       for (i <- expectedStatus.indexes.indices) {
@@ -102,7 +99,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
     } else {
       val currentTags = dut.io.nonCritInfo.currentTags
       val currentIndexes = dut.io.nonCritInfo.currentIndexes
-      val validMSHRs = dut.io.nonCritInfo.validMSHRs
+      val validMSHRs = dut.io.nonCritInfo.validMshrs
       val fullSignals = dut.io.nonCritInfo.fullCmds
 
       for (i <- expectedStatus.indexes.indices) {
@@ -163,25 +160,25 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       defaultAssignments(dut)
 
       // Push an entry
-      pushReq(dut, withCmd = true, tag = 0x12, index = 0x2, byteEn = 0x3, repWay = 2, reqId = 1, coreId = 2)
+      pushReq(dut, tag = 0x12, index = 0x2, byteEn = 0x3, repWay = 2, reqId = 1, coreId = 2)
       assertFifoCapacity(dut, full = false, empty = true)
 
       dut.clock.step()
 
       // Push an entry
-      pushReq(dut, withCmd = true, tag = 0x44, index = 0x1, byteEn = 0x1, repWay = 3, reqId = 2, coreId = 2)
+      pushReq(dut, tag = 0x44, index = 0x1, byteEn = 0x1, repWay = 3, reqId = 2, coreId = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
 
       // Push an entry
-      pushReq(dut, withCmd = false, tag = 0xaa, index = 0xc, byteEn = 0x2, repWay = 2, reqId = 3, coreId = 1, blockOff = 2)
+      pushReq(dut, tag = 0xaa, index = 0xc, byteEn = 0x2, repWay = 2, reqId = 3, coreId = 1, blockOff = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
 
       // Push an entry
-      pushReq(dut, withCmd = true, tag = 0xbb, index = 0xe, byteEn = 0x0, repWay = 1, reqId = 4, coreId = 3, blockOff = 3)
+      pushReq(dut, tag = 0xbb, index = 0xe, byteEn = 0x0, repWay = 1, reqId = 4, coreId = 3, blockOff = 3)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
@@ -267,12 +264,12 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.clock.step()
 
       // Pop an entry
-      popEntry(dut, tag = 0xaa, index = 0xc, byteEn = 0x20, repWay = 2, cmdCnt = 0)
+      popEntry(dut, tag = 0xaa, index = 0xc, byteEn = 0x20, repWay = 2, cmdCnt = 1)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.io.nonCritInfo.fullCmds(2).expect(false.B)
 
-      assertCmds(dut, Array(None, None, None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(3, 1, 2)), None, None, None), print = true)
 
       assertMshrStatusCritQueue(
         dut,
@@ -323,7 +320,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       )
 
       // Push an entry
-      pushReq(dut, withCmd = true, tag = 0xa, index = 0xb, byteEn = 0x3, repWay = 2, reqId = 12, coreId = 2)
+      pushReq(dut, tag = 0xa, index = 0xb, byteEn = 0x3, repWay = 2, reqId = 12, coreId = 2)
 
       dut.clock.step()
 
@@ -358,34 +355,35 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       indexWidth = 4,
       blockOffsetWidth = 2,
       subBlockWidth = subBlockWidth,
-      blockWidth = blockWidth
+      blockWidth = blockWidth,
+      enCritMisses = true
     )).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
 
       // Initialize inputs
       defaultAssignments(dut)
 
       // Push non-critical entry
-      pushReq(dut, withCmd = true, tag = 0x12, index = 0x2, byteEn = 0x3, repWay = 2, reqId = 1, coreId = 2)
+      pushReq(dut, tag = 0x12, index = 0x2, byteEn = 0x3, repWay = 2, reqId = 1, coreId = 2)
       assertFifoCapacity(dut, full = false, empty = true)
 
       dut.clock.step()
 
       // Push critical entry
       dut.io.pushCrit.poke(true.B)
-      pushReq(dut, withCmd = true, tag = 0x44, index = 0x1, byteEn = 0x1, repWay = 3, reqId = 2, coreId = 2)
+      pushReq(dut, tag = 0x44, index = 0x1, byteEn = 0x1, repWay = 3, reqId = 2, coreId = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
 
       // Push critical entry
-      pushReq(dut, withCmd = true, tag = 0xaa, index = 0xc, byteEn = 0x2, repWay = 2, reqId = 3, coreId = 1, blockOff = 2)
+      pushReq(dut, tag = 0xaa, index = 0xc, byteEn = 0x2, repWay = 2, reqId = 3, coreId = 1, blockOff = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
 
       // Push non-critical entry
       dut.io.pushCrit.poke(false.B)
-      pushReq(dut, withCmd = true, tag = 0xbb, index = 0xe, byteEn = 0x3, repWay = 1, reqId = 4, coreId = 3, blockOff = 3)
+      pushReq(dut, tag = 0xbb, index = 0xe, byteEn = 0x3, repWay = 1, reqId = 4, coreId = 3, blockOff = 3)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
@@ -456,19 +454,19 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
       // Push critical entry
       dut.io.pushCrit.poke(true.B)
-      pushReq(dut, withCmd = true, tag = 0x77, index = 0x4, byteEn = 0x3, repWay = 0, reqId = 9, coreId = 1, blockOff = 1)
+      pushReq(dut, tag = 0x77, index = 0x4, byteEn = 0x3, repWay = 0, reqId = 9, coreId = 1, blockOff = 1)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
 
       // Push another critical entry
-      pushReq(dut, withCmd = true, tag = 0x12, index = 0xf, byteEn = 0x0, repWay = 0, reqId = 10, coreId = 2)
+      pushReq(dut, tag = 0x12, index = 0xf, byteEn = 0x0, repWay = 0, reqId = 10, coreId = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()
 
       // Fill up critical queue with the final entry
-      pushReq(dut, withCmd = true, tag = 0xc4, index = 0xa, byteEn = 0x1, repWay = 0, reqId = 11, coreId = 1)
+      pushReq(dut, tag = 0xc4, index = 0xa, byteEn = 0x1, repWay = 0, reqId = 11, coreId = 1)
       assertFifoCapacity(dut, full = false, empty = false)
 
       dut.clock.step()

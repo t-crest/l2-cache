@@ -62,21 +62,21 @@ class SharedPipelinedCache(
     case None => nWays
   }
 
-  val missQueue = Module(new MissFifo(nCores, halfMissCmdCnt, mshrCnt, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, bytesPerSubBlock * 8, bytesPerBlock * 8))
-  val wbQueue = Module(new WriteBackFifo(mshrCnt, tagWidth, indexWidth, bytesPerBlock * 8))
-  val updateLogic = Module(new UpdateUnit(nCores, nWays, reqIdWidth, tagWidth, indexWidth, bytesPerBlock * 8, bytesPerSubBlock * 8))
   val repPol = Module(l2RepPolicy())
+  val missQueue = Module(new MissFifo(nCores, halfMissCmdCnt, mshrCnt, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, bytesPerSubBlock * 8, bytesPerBlock * 8, enCritMisses = repPol.includeCriticalMissQ()))
+  val wbQueue = Module(new WriteBackFifo(mshrCnt, tagWidth, indexWidth, bytesPerBlock * 8, enCritWb = repPol.includeCriticalWbQ()))
+  val updateLogic = Module(new UpdateUnit(nCores, nWays, reqIdWidth, tagWidth, indexWidth, bytesPerBlock * 8, bytesPerSubBlock * 8))
 
   val schedulerDataWidth = repPol.getSchedulerDataWidth
   val l2CacheBytesPerSubBlock = bytesPerSubBlock
 
   val invalidateLine = WireDefault(false.B)
+  val insertBubble = WireDefault(false.B)
   val invalidateWay = WireDefault(0.U(log2Up(nWays).W))
   val invalidateIndex = WireDefault(0.U(indexWidth.W))
   val missFifoCmdCapacity = WireDefault(false.B)
   val repDirtyInvalidStall = WireDefault(false.B)
   val writeMissHazard = WireDefault(false.B)
-  val memIntPopWb = WireDefault(false.B)
 
   println(
     s"L2 Cache Configuration: " +
@@ -106,7 +106,7 @@ class SharedPipelinedCache(
   val coreReqArbiter = Module(new CoreReqArbiter(nCores = nCores, addrWidth = addressWidth, dataWidth = bytesPerSubBlock * 8, reqIdWidth = reqIdWidth))
 
   val pipeStall = updateLogic.io.stall || missQueue.io.full || missFifoCmdCapacity || repDirtyInvalidStall || writeMissHazard
-  val reqAccept = !pipeStall
+  val reqAccept = !pipeStall && !insertBubble
 
   // Connect core request and rejection queue to the core request multiplexer that feeds into the cache pipeline
   coreReqArbiter.io.req1 <> io.core.req
@@ -117,10 +117,11 @@ class SharedPipelinedCache(
 
   // Connect replacement policy with the rejection queue
   repPol.io.scheduler <> io.scheduler
+  insertBubble := repPol.io.control.insertBubble
 
   // ---------------- Decode ----------------
   val decLogic = Module(new Dec(nCores = nCores, nWays = nWays, reqIdWidth = reqIdWidth, tagWidth = tagWidth, indexWidth = indexWidth, blockOffWidth = blockOffsetWidth, byteOffWidth = byteOffsetWidth, subBlockWidth = bytesPerSubBlock * 8))
-  decLogic.io.stall := pipeStall
+  decLogic.io.stall := pipeStall || insertBubble
   decLogic.io.dec.coreId := coreReqArbiter.io.outCoreID
   decLogic.io.dec.reqValid := coreReqArbiter.io.out.reqId.valid
   decLogic.io.dec.reqId := coreReqArbiter.io.out.reqId.bits
@@ -130,9 +131,8 @@ class SharedPipelinedCache(
   decLogic.io.dec.byteEn := coreReqArbiter.io.out.byteEn
 
   // ---------------- Tag and Dirty Lookup ----------------
-
   val tagLogic = Module(new Tag(nCores = nCores, nSets = nSets, nWays = nWays, reqIdWidth = reqIdWidth, tagWidth = tagWidth, indexWidth = indexWidth, blockOffWidth = blockOffsetWidth, subBlockWidth = bytesPerSubBlock * 8))
-  tagLogic.io.stall := pipeStall
+  tagLogic.io.stall := pipeStall || insertBubble
   tagLogic.io.tag <> decLogic.io.tag
   tagLogic.io.tagCtrl <> updateLogic.io.tagUpdate
   tagLogic.io.invalidate.invalidate := invalidateLine
@@ -141,8 +141,7 @@ class SharedPipelinedCache(
   tagLogic.io.setLineValid := updateLogic.io.setValidLine
 
   // ---------------- Replacement ----------------
-
-  val repLogic = Module(new Rep(nCores = nCores, nSets = nSets, nWays = nWays, nMshrs = mshrCnt, reqIdWidth = reqIdWidth, tagWidth = tagWidth, indexWidth = indexWidth, blockWidth = bytesPerBlock * 8, subBlockWidth = bytesPerSubBlock * 8))
+  val repLogic = Module(new Rep(nCores = nCores, nSets = nSets, nWays = nWays, nMshrs = mshrCnt, reqIdWidth = reqIdWidth, tagWidth = tagWidth, indexWidth = indexWidth, blockWidth = bytesPerBlock * 8, subBlockWidth = bytesPerSubBlock * 8, useInvalidate = !repPol.isInstanceOf[ContentionReplacementPolicy]))
   repLogic.io.stall := pipeStall
   repLogic.io.rep <> tagLogic.io.rep
   repLogic.io.missFifoPush <> missQueue.io.push
@@ -151,20 +150,17 @@ class SharedPipelinedCache(
   repLogic.io.repPolCtrl <> repPol.io.control
   repLogic.io.repPolInfo <> repPol.io.info
   repLogic.io.setLineValid := updateLogic.io.setValidLine
-  repLogic.io.nonCritWbPop := memIntPopWb
-  repLogic.io.nonCritWbEntryIsCrit := wbQueue.io.isFirstInQCrit
   invalidateLine := repLogic.io.invalidate.invalidate
   invalidateWay := repLogic.io.invalidate.way
   invalidateIndex := repLogic.io.invalidate.index
   missQueue.io.pushCrit := repLogic.io.isMissPushCrit
   missFifoCmdCapacity := repLogic.io.halfMissCapacity
-  repDirtyInvalidStall := repLogic.io.dirtyInvalidStall
+  repDirtyInvalidStall := repLogic.io.evictionLineBusy
   rejectionQueue.io.push := repLogic.io.pushReject
   rejectionQueue.io.pushEntry := repLogic.io.pushRejectEntry
-  writeMissHazard := repLogic.io.writeMissHazard
+  repLogic.io.wbInfo <> wbQueue.io.wbInfo
 
   // ---------------- Read ----------------
-
   val readLogic = Module(new Read(memSizeInBytes = sizeInBytes, nCores = nCores, nWays = nWays, reqIdWidth = reqIdWidth, tagWidth = tagWidth, indexWidth = indexWidth, blockOffWidth = blockOffsetWidth, blockWidth = bytesPerBlock * 8, subBlockWidth = bytesPerSubBlock * 8))
   readLogic.io.stall := pipeStall
   readLogic.io.read <> repLogic.io.read
@@ -175,7 +171,6 @@ class SharedPipelinedCache(
   wbQueue.io.pushCrit := readLogic.io.wbQueuePushCrit
 
   // ---------------- Update ----------------
-
   val memInterface = Module(new MemoryInterface(nCores, nWays, halfMissCmdCnt, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, bytesPerBlock * 8, bytesPerSubBlock * 8, beatSize = memBeatSize, burstLen = memBurstLen))
   memInterface.io.missFifo <> missQueue.io.pop
   memInterface.io.missCritEmpty := missQueue.io.critEmpty
@@ -184,7 +179,6 @@ class SharedPipelinedCache(
   memInterface.io.wbCritEmpty := wbQueue.io.critEmpty
   memInterface.io.wbNonCritEmpty := wbQueue.io.nonCritEmpty
   memInterface.io.memController <> io.mem
-  memIntPopWb := memInterface.io.wbFifo.pop
   missQueue.io.popQSel := memInterface.io.popQSel
   wbQueue.io.popQSel := memInterface.io.popQSel
 

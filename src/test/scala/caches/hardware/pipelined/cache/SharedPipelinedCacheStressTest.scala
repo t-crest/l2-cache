@@ -8,19 +8,21 @@ class SharedPipelinedCacheStressTest extends AnyFlatSpec with ChiselScalatestTes
   "SharedPipelinedCache" should "handle stress test with bit plru policy" in {
     val cache = generateDut(CacheConfigs.config64BitPlru)
 
-    test(cache._1.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation)) { dut =>
-      defaultAssignments(dut, cache._2)
+    test(cache.dutGen.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation)) { dut =>
+      defaultAssignments(dut, cache.nCores)
 
       performTestActions(
         dut,
-        cache._2,
+        cache.nCores,
         Tests.testActions3,
-        cache._3,
-        cache._4,
-        cache._5,
+        cache.indexWidth,
+        cache.blockOffsetWidth,
+        cache.byteOffsetWidth,
         1000,
         printResults = PRINT_RESULTS
       )
+
+      dut.clock.step()
     }
   }
 }

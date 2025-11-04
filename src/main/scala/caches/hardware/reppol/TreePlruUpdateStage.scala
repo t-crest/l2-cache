@@ -5,6 +5,28 @@ import chisel3.util._
 
 class TreePlruUpdateStage(nWays: Int) extends BasePolicyUpdateStageType(nWays, nWays - 1) {
   val wayIdxBits = log2Up(nWays)
+  val newState = update(Mux(io.hit, io.hitWay, io.repWay), io.stateIn)
+
+  override def getRepWay(state: UInt): UInt = {
+    val lru = VecInit(Seq.fill(wayIdxBits)(false.B))
+    val treePath = VecInit(Seq.fill(wayIdxBits)(0.U(wayIdxBits.W)))
+
+    for (i <- 0 until wayIdxBits) {
+      val nodeState = state(treePath(i))
+      lru(wayIdxBits - 1 - i) := nodeState // Set the MSB bits first
+      if (i != wayIdxBits - 1) {
+        val pathOffset = (treePath(i) << 1).asUInt
+
+        when(nodeState === true.B) {
+          treePath(i + 1) := pathOffset + 2.U
+        }.otherwise {
+          treePath(i + 1) := pathOffset + 1.U
+        }
+      }
+    }
+
+    lru.asUInt
+  }
 
   override def update(hitWay: UInt, state: UInt): UInt = {
     val lruBits = VecInit(state.asBools)
@@ -34,5 +56,6 @@ class TreePlruUpdateStage(nWays: Int) extends BasePolicyUpdateStageType(nWays, n
     newLru.asUInt
   }
 
-  io.stateOut := update(io.hitWay, io.stateIn)
+  io.stateOut := newState
+  io.repWayOut := getRepWay(newState)
 }

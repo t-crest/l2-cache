@@ -207,16 +207,16 @@ class ContentionReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTe
       performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 3)
 
       // Perform eviction using critical core during a miss, which should trigger an event
-      dut.io.policy.info.missQueueCores(0).poke(2.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(true.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(true.B)
+      dut.io.policy.info.missQueueValidReqs(1).poke(true.B)
+      dut.io.policy.info.missQueueCritReqs(1).poke(true.B)
 
       performEvictionRequest(dut, coreId = 1, setIdx = workingSet, expectedEvictionCandidate = Some(0))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 0)
       dut.clock.step()
 
-      dut.io.policy.info.missQueueCores(0).poke(0.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(false.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(false.B)
 
       // Now try to evict the critical core using non-critical
       performEvictionRequest(dut, coreId = 2, setIdx = workingSet, expectedEvictionCandidate = None)
@@ -253,16 +253,14 @@ class ContentionReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTe
       performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 3)
 
       // Perform eviction using unlimited critical core during a miss, which should trigger an event
-      dut.io.policy.info.missQueueCores(0).poke(0.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(true.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(true.B)
 
       performEvictionRequest(dut, coreId = 1, setIdx = workingSet, expectedEvictionCandidate = Some(0))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 0)
       dut.clock.step()
 
-      dut.io.policy.info.missQueueCores(0).poke(0.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(false.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(false.B)
 
       // Now try to evict the critical core using non-critical
       performEvictionRequest(dut, coreId = 0, setIdx = workingSet, expectedEvictionCandidate = None)
@@ -298,16 +296,14 @@ class ContentionReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTe
 
       // Perform eviction using unlimited critical core during a miss, which should trigger 2 events:
       // One eviction event and one miss-in-miss
-      dut.io.policy.info.missQueueCores(0).poke(2.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(true.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(true.B)
 
       performEvictionRequest(dut, coreId = 0, setIdx = workingSet, expectedEvictionCandidate = Some(0))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 0, setIdx = workingSet, hitWay = 0)
       dut.clock.step()
 
-      dut.io.policy.info.missQueueCores(0).poke(0.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(false.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(false.B)
 
       // Now use all the non-critical lines to reset the critical core to least recently used
       performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 1)
@@ -412,19 +408,15 @@ class ContentionReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTe
       performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 0)
 
       // Bring the contention limit down by indicating that there is currently two outstanding misses in the queue
-      dut.io.policy.info.missQueueCores(0).poke(1.U)
-      dut.io.policy.info.missQueueCores(1).poke(0.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(true.B)
-      dut.io.policy.info.missQueueValidCores(1).poke(true.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(true.B)
+      dut.io.policy.info.missQueueValidReqs(1).poke(true.B)
 
       performEvictionRequest(dut, coreId = 2, setIdx = workingSet, expectedEvictionCandidate = Some(1))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 1)
 
-      dut.io.policy.info.missQueueCores(0).poke(0.U)
-      dut.io.policy.info.missQueueCores(1).poke(0.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(false.B)
-      dut.io.policy.info.missQueueValidCores(1).poke(false.B)
+      dut.io.policy.info.missQueueValidReqs(0).poke(false.B)
+      dut.io.policy.info.missQueueValidReqs(1).poke(false.B)
 
       // Get the plru to point to the critical core's line
       performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 2)
@@ -444,8 +436,8 @@ class ContentionReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTe
       val workingSet = 1
       dut.clock.step()
 
-      // Set the first core as critical with a contention limit of 2
-      setCoreAsCritical(dut, coreID = 2, wData = 2)
+      // Set the first core as critical with a contention limit of 3
+      setCoreAsCritical(dut, coreID = 2, wData = 3)
 
       // Assign some lines to cores
       performEvictionRequest(dut, coreId = 2, setIdx = workingSet, expectedEvictionCandidate = Some(0))
@@ -465,50 +457,44 @@ class ContentionReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTe
       performUpdateRequest(dut, coreId = 0, setIdx = workingSet, hitWay = 3)
 
       // Simulate a WB, the wb entry is critical, thus a wb event should not be triggered
-      dut.io.policy.info.nonCritWbPop.poke(true.B)
-      dut.io.policy.info.nonCritWbEntryIsCrit.poke(true.B)
-      // Simulate a critical core being in the miss-q
-      dut.io.policy.info.missQueueCores(1).poke(2.U)
-      dut.io.policy.info.missQueueValidCores(1).poke(true.B)
-      // Add a non-critical core in the miss-q too
-      dut.io.policy.info.missQueueCores(0).poke(1.U)
-      dut.io.policy.info.missQueueValidCores(0).poke(true.B)
+      dut.io.policy.info.wbQueueCritReqs(0).poke(false.B)
+      dut.io.policy.info.wbQueueValidReqs(0).poke(true.B)
+      dut.io.policy.info.wbQueueCritReqs(1).poke(true.B)
+      dut.io.policy.info.wbQueueValidReqs(1).poke(true.B)
 
       dut.clock.step(1)
-
-      dut.io.policy.info.nonCritWbPop.poke(false.B)
-      dut.io.policy.info.nonCritWbEntryIsCrit.poke(false.B)
 
       // Trigger a replacement event
       performEvictionRequest(dut, coreId = 1, setIdx = workingSet, expectedEvictionCandidate = Some(0))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 0)
 
-      // Simulate a WB again, the wb entry is non-critical, thus a wb event should be triggered
-      dut.io.policy.info.nonCritWbPop.poke(true.B)
-      dut.io.policy.info.nonCritWbEntryIsCrit.poke(false.B)
-
       dut.clock.step(1)
 
-      dut.io.policy.info.nonCritWbPop.poke(false.B)
-      dut.io.policy.info.nonCritWbEntryIsCrit.poke(false.B)
-
-      // Make a critical core evict a new line
+      // Make a critical core evict a new line, this should trigger a wb event since there are non-critical WBs in Q
       performEvictionRequest(dut, coreId = 2, setIdx = workingSet, expectedEvictionCandidate = Some(1))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 1)
 
-      // Make a critical core evict a new line
+      // Remove the non critical wb
+      dut.io.policy.info.wbQueueValidReqs(0).poke(false.B)
+
+      // Make a critical core evict another new line, wb event should not be triggered since there is a critical wb
       performEvictionRequest(dut, coreId = 2, setIdx = workingSet, expectedEvictionCandidate = Some(2))
       dut.clock.step()
       performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 2)
 
-      // Make plru point to the first critical line
-      performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 3)
-      performUpdateRequest(dut, coreId = 1, setIdx = workingSet, hitWay = 0)
+      // Add a new non-critical wb
+      dut.io.policy.info.wbQueueCritReqs(2).poke(false.B)
+      dut.io.policy.info.wbQueueValidReqs(2).poke(true.B)
 
-      // Now try to evict the critical line using a non-critical core, should evict non-critical line instead
+      // Perform another eviction, expect this to raise a wb event and reach contention limit
       performEvictionRequest(dut, coreId = 2, setIdx = workingSet, expectedEvictionCandidate = Some(0))
+      dut.clock.step()
+      performUpdateRequest(dut, coreId = 2, setIdx = workingSet, hitWay = 0)
+
+      // Now try to evict the critical line using a non-critical core, should evict first non-critical line instead
+      performEvictionRequest(dut, coreId = 1, setIdx = workingSet, expectedEvictionCandidate = Some(3))
 
       dut.clock.step()
     }

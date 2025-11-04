@@ -9,22 +9,22 @@ class SharedPipelinedCacheWbTest extends AnyFlatSpec with ChiselScalatestTester 
   "SharedPipelinedCache" should "work with wb contention events" in {
     val cache = generateDut(CacheConfigs.config64ContWb)
 
-    test(cache._1.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation, PrintFullStackTraceAnnotation)) { dut =>
-      defaultAssignments(dut, cache._2)
+    test(cache.dutGen.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation, PrintFullStackTraceAnnotation)) { dut =>
+      defaultAssignments(dut, cache.nCores)
 
       // Issue the first set of requests
       performTestActions(
         dut,
-        cache._2,
+        cache.nCores,
         Tests.testActions6,
-        cache._3,
-        cache._4,
-        cache._5,
+        cache.indexWidth,
+        cache.blockOffsetWidth,
+        cache.byteOffsetWidth,
         1500,
         printResults = PRINT_RESULTS
       )
 
-      dut.clock.step(1)
+      dut.clock.step()
     }
   }
 }

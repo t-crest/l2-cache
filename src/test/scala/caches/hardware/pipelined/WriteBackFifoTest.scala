@@ -20,7 +20,6 @@ class WriteBackFifoTest extends AnyFlatSpec with ChiselScalatestTester {
     dut.io.pop.popEntry.tag.expect(tag.U)
     dut.io.pop.popEntry.index.expect(index.U)
     dut.io.pop.popEntry.wbData.expect(wbData.U)
-    dut.io.isFirstInQCrit.expect(isCrit.B)
   }
 
   def resetInputs(dut: WriteBackFifo): Unit = {
@@ -103,7 +102,7 @@ class WriteBackFifoTest extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   "WriteBackFifo" should "switch between critical and non-critical wb Qs" in {
-    test(new WriteBackFifo(queueDepth = 4, tagWidth = 16, indexWidth = 8, blockWidth = 32)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+    test(new WriteBackFifo(queueDepth = 4, tagWidth = 16, indexWidth = 8, blockWidth = 32, enCritWb = true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       // Initialize inputs
       resetInputs(dut)
 

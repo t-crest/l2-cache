@@ -1,7 +1,5 @@
 package caches.hardware.reppol
 
-import caches.hardware.reppol._
-
 trait BasePolicyType {
   def buildBasePolicyRead(nWays: Int, nSets: Int, repSetFormat: BaseReplacementSetFormat): BasePolicyReadStageType
 

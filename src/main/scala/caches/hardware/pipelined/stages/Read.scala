@@ -14,6 +14,7 @@ class DirtyCtrlIO(nWays: Int, indexWidth: Int) extends Bundle {
 
 class ReadIO(nCores: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffWidth: Int, blockWidth: Int, subBlockWidth: Int) extends Bundle() {
   val coreId = Input(UInt(log2Up(nCores).W))
+  val wb = Input(Bool())
   val repWayAtLimit = Input(Bool())
   val isRepWayCrit = Input(Bool())
   val reqValid = Input(Bool())
@@ -42,6 +43,7 @@ class Read(memSizeInBytes: Int, nCores: Int, nWays: Int, reqIdWidth: Int, tagWid
     val update = Flipped(new UpdateIO(nCores = nCores, nWays = nWays, reqIdWidth = reqIdWidth, tagWidth = tagWidth, indexWidth = indexWidth, blockWidth = blockWidth, subBlockWidth = subBlockWidth))
     val dirtyCtrl = new DirtyCtrlIO(nWays = nWays, indexWidth = indexWidth)
   })
+  private val nSubBlocks = blockWidth / subBlockWidth
 
   val dataMem = Module(new CacheMemory(memSizeInBytes, nWays, blockWidth / 8, subBlockWidth / 8))
 
@@ -54,6 +56,7 @@ class Read(memSizeInBytes: Int, nCores: Int, nWays: Int, reqIdWidth: Int, tagWid
   dataMem.io.byteMask := io.memUpdate.byteMask
   dataMem.io.stall := io.stall
 
+  val wbReg = PipelineReg(io.read.wb, false.B, !io.stall)
   val coreIdReg = PipelineReg(io.read.coreId, 0.U, !io.stall)
   val repWayAtLimitReg = PipelineReg(io.read.repWayAtLimit, false.B, !io.stall)
   val isRepWayCritReg = PipelineReg(io.read.isRepWayCrit, false.B, !io.stall)
@@ -66,22 +69,19 @@ class Read(memSizeInBytes: Int, nCores: Int, nWays: Int, reqIdWidth: Int, tagWid
   val isHitReg = PipelineReg(io.read.isHit, false.B, !io.stall)
   val hitWayReg = PipelineReg(io.read.hitWay, 0.U, !io.stall)
   val repWayReg = PipelineReg(io.read.repWay, 0.U, !io.stall)
-  val isRepDirtyReg = PipelineReg(io.read.isRepDirty, false.B, !io.stall)
   val dirtyTagReg = PipelineReg(io.read.dirtyTag, 0.U, !io.stall)
   val blockOffsetReg = PipelineReg(io.read.blockOffset, 0.U, !io.stall)
   val indexReg = PipelineReg(io.read.index, 0.U, !io.stall)
   val tagReg = PipelineReg(io.read.tag, 0.U, !io.stall)
 
-  val wb = reqValidReg && !isHitReg && isRepDirtyReg && repValidReg
-
   io.wbQueuePushCrit := isRepWayCritReg && repWayAtLimitReg
-  io.wbQueue.push := wb && !io.stall
+  io.wbQueue.push := wbReg && !io.stall
   io.wbQueue.pushEntry.wbData := dataMem.io.rData.asUInt
   io.wbQueue.pushEntry.tag := dirtyTagReg
   io.wbQueue.pushEntry.index := indexReg
   io.wbQueue.pushEntry.isCrit := isRepWayCritReg
 
-  io.dirtyCtrl.unset := wb
+  io.dirtyCtrl.unset := wbReg
   io.dirtyCtrl.set := reqValidReg && reqRwReg && (isHitReg || repValidReg)
   io.dirtyCtrl.wIndex := indexReg
   io.dirtyCtrl.wWay := Mux(isHitReg, hitWayReg, repWayReg)
@@ -99,7 +99,5 @@ class Read(memSizeInBytes: Int, nCores: Int, nWays: Int, reqIdWidth: Int, tagWid
   io.update.blockOffset := PipelineReg(blockOffsetReg, 0.U, !io.stall)
   io.update.index := PipelineReg(indexReg, 0.U, !io.stall)
   io.update.tag := PipelineReg(tagReg, 0.U, !io.stall)
-
-  private val nSubBlocks = blockWidth / subBlockWidth
   io.update.memReadData := PipelineReg(dataMem.io.rData, VecInit(Seq.fill(nSubBlocks)(0.U(subBlockWidth.W))), !io.stall)
 }

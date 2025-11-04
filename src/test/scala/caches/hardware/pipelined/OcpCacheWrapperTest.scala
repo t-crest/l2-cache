@@ -136,7 +136,7 @@ class OcpCacheWrapperTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.cores(0).S.CmdAccept.expect(false.B)
       dut.io.cores(0).S.DataAccept.expect(false.B)
 
-      dut.clock.step(5)
+      dut.clock.step(6)
 
       // --------------- Expect the cache to issue a read command ---------------
       dut.io.mem.M.Cmd.expect(OcpCmd.RD)
@@ -294,7 +294,7 @@ class OcpCacheWrapperTest extends AnyFlatSpec with ChiselScalatestTester {
       dut.io.cores(2).M.Addr.poke(0.U)
 
       // Step until the cache generates a read request to memory
-      dut.clock.step(5)
+      dut.clock.step(6)
 
       dut.io.mem.M.Cmd.expect(OcpCmd.RD)
       dut.io.mem.M.Addr.expect("ha4e0".U)

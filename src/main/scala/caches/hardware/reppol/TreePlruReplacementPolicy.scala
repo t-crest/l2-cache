@@ -12,34 +12,62 @@ import chisel3.util._
  * @param nCores number of cores sharing the cache
  */
 class TreePlruReplacementPolicy(nWays: Int, nSets: Int, nCores: Int, repSetFormat: BaseReplacementSetFormat = new NumericalFormat) extends SharedCacheReplacementPolicyType(nWays, nSets, nCores, repSetFormat = repSetFormat) {
-  override def printConfig(): Unit = println(s"Tree PLRU replacement policy configuration: ways: $nWays, sets: $nSets, cores: $nCores" + "\n")
+  override def printConfig(): Unit = println(s"Tree PLRU replacement policy configuration: " +
+    s"ways: $nWays, " +
+    s"sets: $nSets, " +
+    s"cores: $nCores" + "\n")
+
+  override def includeCriticalMissQ(): Boolean = false
+
+  override def includeCriticalWbQ(): Boolean = false
 
   // ---------------- Read stage ----------------
-  val updateStageSetIdx = WireDefault(0.U(log2Up(nSets).W))
-  val updatedStageWbMruBits = WireDefault(0.U((nWays - 1).W))
   val idxDelayReg = PipelineReg(io.control.setIdx, 0.U, !io.control.stall)
 
-  val treePlruRead = Module(new TreePlruReadStage(nWays, nSets, repSetFormat))
-  treePlruRead.io.stall := io.control.stall
-  treePlruRead.io.rIdx := io.control.setIdx
-  treePlruRead.io.wrEn := io.control.update.valid
-  treePlruRead.io.wIdx := updateStageSetIdx
-  treePlruRead.io.wData := updatedStageWbMruBits
-  treePlruRead.io.fwd := updateStageSetIdx === idxDelayReg && io.control.update.valid
+  val wbStageIdx = WireDefault(0.U(log2Up(nSets).W))
+  val wbStageRepWay = WireDefault(0.U(log2Up(nWays).W))
+  val wbStageMruBits = WireDefault(0.U(nWays.W))
 
-  val replaceWayPipeReg = PipelineReg(treePlruRead.io.replaceWay, 0.U, !io.control.stall)
-  val replaceSetPipeReg = PipelineReg(treePlruRead.io.replacementSet, getDefaultRepSet, !io.control.stall)
-  val mruBitsPipeReg = PipelineReg(treePlruRead.io.readState, 0.U, !io.control.stall)
-  val setIdxPipeReg = PipelineReg(idxDelayReg, 0.U, !io.control.stall)
+  val bitPlruRead = Module(new TreePlruReadStage(nWays, nSets, repSetFormat))
+
+  val fwd1 = wbStageIdx === idxDelayReg && io.control.update
+
+  bitPlruRead.io.stall := io.control.stall
+  bitPlruRead.io.rIdx := io.control.setIdx
+  bitPlruRead.io.wrEn := io.control.update
+  bitPlruRead.io.wIdx := wbStageIdx
+  bitPlruRead.io.wData := wbStageMruBits
+  bitPlruRead.io.fwd := fwd1
+
+  val repWayPipeReg1 = PipelineReg(bitPlruRead.io.replaceWay, 0.U, !io.control.stall)
+  val repSetPipeReg1 = PipelineReg(bitPlruRead.io.replacementSet, getDefaultRepSet, !io.control.stall)
+  val mruBitsPipeReg1 = PipelineReg(bitPlruRead.io.readState, 0.U, !io.control.stall)
+  val setIdxPipeReg1 = PipelineReg(idxDelayReg, 0.U, !io.control.stall)
 
   // ---------------- Update stage ----------------
-  val treePlruUpdate = Module(new TreePlruUpdateStage(nWays))
-  treePlruUpdate.io.hitWay := io.control.update.bits
-  treePlruUpdate.io.stateIn := mruBitsPipeReg
+  val bitPlruUpdate = Module(new TreePlruUpdateStage(nWays))
 
+  val fwd2 = wbStageIdx === setIdxPipeReg1 && io.control.update
+  val inRepWay = Mux(fwd2, wbStageRepWay, repWayPipeReg1)
+  val inMruBits = Mux(fwd2, wbStageMruBits, mruBitsPipeReg1)
+
+  // Update base policy
+  bitPlruUpdate.io.hit := io.info.isHit
+  bitPlruUpdate.io.hitWay := io.info.hitWay
+  bitPlruUpdate.io.repWay := inRepWay
+  bitPlruUpdate.io.stateIn := inMruBits
+
+  val newRepWayPipeReg = PipelineReg(bitPlruUpdate.io.repWayOut, 0.U, !io.control.stall)
+  val repWayPipeReg2 = PipelineReg(inRepWay, 0.U, !io.control.stall)
+  val repSetPipeReg2 = PipelineReg(repSetPipeReg1, getDefaultRepSet, !io.control.stall)
+  val mruBitsPipeReg2 = PipelineReg(bitPlruUpdate.io.stateOut, 0.U, !io.control.stall)
+  val setIdxPipeReg2 = PipelineReg(setIdxPipeReg1, 0.U, !io.control.stall)
+
+  // ---------------- WB stage ----------------
   // Forwarding signals
-  updatedStageWbMruBits := treePlruUpdate.io.stateOut // Updated LRU bits to writeback to memory
-  updateStageSetIdx := setIdxPipeReg
+  wbStageIdx := setIdxPipeReg2
+  wbStageMruBits := mruBitsPipeReg2
+  wbStageRepWay := newRepWayPipeReg
 
   // Default output assignments
   io.control <> 0.U.asTypeOf(io.control)
@@ -47,10 +75,10 @@ class TreePlruReplacementPolicy(nWays: Int, nSets: Int, nCores: Int, repSetForma
   io.scheduler <> 0.U.asTypeOf(io.scheduler)
 
   // We assign only the signals that are relevant to this policy
-  io.control.replaceWay := replaceWayPipeReg
+  io.control.replaceWay := repWayPipeReg2
   io.control.isValid := true.B
 
   // Debugging signal
-  repSet := replaceSetPipeReg
+  repSet := repSetPipeReg2
 }
 

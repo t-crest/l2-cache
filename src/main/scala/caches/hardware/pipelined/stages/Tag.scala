@@ -99,6 +99,19 @@ class Tag(nCores: Int, nSets: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, i
     val stall = Input(Bool())
   })
 
+  def checkIfHit(validBits: Vec[Bool], tags: Vec[UInt], currTag: UInt): IsHitResult = {
+    // Compare tags and check if there is a hit and where
+    val hits = Wire(Vec(nWays, Bool()))
+    for (wayIdx <- 0 until nWays) {
+      hits(wayIdx) := validBits(wayIdx) && (currTag === tags(wayIdx))
+    }
+
+    val hit = hits.reduce((x, y) => x || y)
+    val hitWay = PriorityEncoder(hits)
+
+    IsHitResult(hit, hitWay)
+  }
+
   val tagMem = Array.fill(nWays)(Module(new MemBlock(nSets, tagWidth)))
   val validBitMem = Module(new ValidMem(nWays, nSets))
   val dirtyBitMem = Module(new DirtyMem(nWays, nSets))
@@ -153,14 +166,17 @@ class Tag(nCores: Int, nSets: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, i
     dirtyBitsForIndex(io.dirtyCtrl.wWay) := false.B
   }
 
+  val hitCheck = checkIfHit(validBitsForIndex, tagsForIndex, io.tag.tag)
+
   io.rep.coreId := PipelineReg(io.tag.coreId, 0.U, !io.stall)
   io.rep.reqValid := PipelineReg(io.tag.reqValid, false.B, !io.stall)
   io.rep.reqId := PipelineReg(io.tag.reqId, 0.U, !io.stall)
+  io.rep.reqHit := PipelineReg(hitCheck.hit, false.B, !io.stall)
+  io.rep.reqHitWay := PipelineReg(hitCheck.hitIdx, 0.U, !io.stall)
   io.rep.reqRw := PipelineReg(io.tag.reqRw, false.B, !io.stall)
   io.rep.wData := PipelineReg(io.tag.wData, 0.U, !io.stall)
   io.rep.byteEn := PipelineReg(io.tag.byteEn, 0.U, !io.stall)
   io.rep.dirtyBits := PipelineReg(dirtyBitsForIndex, VecInit(Seq.fill(nWays)(false.B)), !io.stall)
-  io.rep.validBits := PipelineReg(validBitsForIndex, VecInit(Seq.fill(nWays)(false.B)), !io.stall)
   io.rep.setTags := PipelineReg(tagsForIndex, VecInit(Seq.fill(nWays)(0.U(tagWidth.W))), !io.stall) // Need this to get the dirty tag later on
   io.rep.blockOffset := PipelineReg(io.tag.blockOffset, 0.U, !io.stall)
   io.rep.index := PipelineReg(io.tag.index, 0.U, !io.stall)

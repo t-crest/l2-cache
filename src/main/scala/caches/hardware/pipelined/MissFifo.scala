@@ -26,8 +26,8 @@ class MshrInfoIO(nCores: Int, nMshrs: Int, nWays: Int, indexWidth: Int, tagWidth
   val currentTags = Output(Vec(nMshrs, UInt(tagWidth.W)))
   val replacementWays = Output(Vec(nMshrs, UInt(log2Up(nWays).W)))
   val incidentCoreIds = Output(Vec(nMshrs, UInt(log2Up(nCores).W)))
-  val isCritCores = Output(Vec(nMshrs, Bool()))
-  val validMSHRs = Output(Vec(nMshrs, Bool()))
+  val critMshrs = Output(Vec(nMshrs, Bool()))
+  val validMshrs = Output(Vec(nMshrs, Bool()))
   val fullCmds = Output(Vec(nMshrs, Bool()))
   val wrPtr = Output(UInt(log2Ceil(nMshrs).W))
   val elementCnt = Output(UInt(log2Up(nMshrs + 1).W))
@@ -36,7 +36,6 @@ class MshrInfoIO(nCores: Int, nMshrs: Int, nWays: Int, indexWidth: Int, tagWidth
 class MshrPushIO(nCores: Int, nMshrs: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffsetWidth: Int, subBlockWidth: Int) extends Bundle() {
   // For inserting a new MSHR entry
   val pushReq = Input(Bool())
-  val withCmd = Input(Bool()) // If true, the pushReqEntry will be pushed with a command
   val pushReqEntry = new LineRequestIO(nCores, nWays, tagWidth, indexWidth, subBlockWidth)
   // For pushing new command into MSHR entry
   val pushCmd = Input(Bool())
@@ -234,7 +233,6 @@ class CmdMshrQueue(nCmds: Int, nCores: Int, nMshrs: Int, reqIdWidth: Int, blockO
 
   val io = IO(new Bundle {
     val push = Input(Bool())
-    val withCmd = Input(Bool())
     val update = Input(Bool())
     val rdPtr = Input(UInt(log2Up(nMshrs).W))
     val wrPtr = Input(UInt(log2Up(nMshrs).W))
@@ -249,7 +247,7 @@ class CmdMshrQueue(nCmds: Int, nCores: Int, nMshrs: Int, reqIdWidth: Int, blockO
   val cntRegs = RegInit(VecInit(Seq.fill(nMshrs)(0.U((log2Up(nCmds) + 1).W))))
 
   when(io.push) {
-    cntRegs(io.wrPtr) := Mux(io.withCmd, 1.U, 0.U)
+    cntRegs(io.wrPtr) := 1.U
   }.elsewhen(io.update) {
     cntRegs(io.updtPtr) := cntRegs(io.updtPtr) + 1.U
   }
@@ -260,7 +258,7 @@ class CmdMshrQueue(nCmds: Int, nCores: Int, nMshrs: Int, reqIdWidth: Int, blockO
   cmdBlockQueue.io.update := io.update
   cmdBlockQueue.io.rdPtr := io.rdPtr
   cmdBlockQueue.io.wrPtr := io.wrPtr
-  cmdBlockQueue.io.wrData := Mux(io.withCmd, io.wrData, 0.U)
+  cmdBlockQueue.io.wrData := io.wrData
   cmdBlockQueue.io.updtPtr := io.updtPtr
   cmdBlockQueue.io.updtBlockIdx := cntRegs(io.updtPtr)
   cmdBlockQueue.io.updtData := io.updtData
@@ -295,7 +293,6 @@ class MshrQueue(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: In
   reqQueue.io.pop := io.pop.pop
 
   cmdQueue.io.push := io.push.pushReq
-  cmdQueue.io.withCmd := io.push.withCmd
   cmdQueue.io.update := io.push.pushCmd
   cmdQueue.io.rdPtr := reqQueue.io.rdPtr
   cmdQueue.io.wrPtr := reqQueue.io.wrPtr
@@ -320,12 +317,12 @@ class MshrQueue(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: In
   io.push.full := reqQueue.io.full
 
   io.info.wrPtr := reqQueue.io.wrPtr
-  io.info.validMSHRs := validMshrs
+  io.info.validMshrs := validMshrs
   io.info.currentTags := reqQueue.io.currentTags
   io.info.currentIndexes := reqQueue.io.currentIndexes
   io.info.replacementWays := reqQueue.io.replacementWays
   io.info.incidentCoreIds := reqQueue.io.incidentCoreIds
-  io.info.isCritCores := reqQueue.io.isCritCores
+  io.info.critMshrs := reqQueue.io.isCritCores
   io.info.fullCmds := cmdQueue.io.full
   io.info.elementCnt := queueElementCntReg
 
@@ -335,53 +332,67 @@ class MshrQueue(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: In
   io.pop.cmds := cmdQueue.io.rdCmds
 }
 
-class MissFifo(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffsetWidth: Int, subBlockWidth: Int, blockWidth: Int) extends Module {
+class MissFifo(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffsetWidth: Int, subBlockWidth: Int, blockWidth: Int, enCritMisses: Boolean = false) extends Module {
   val io = IO(new MissFifoIO(nCores, nMshrs, nCmds, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, blockWidth, subBlockWidth))
 
-  val critQueue = Module(new MshrQueue(nCores, nCmds, nMshrs, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, subBlockWidth, blockWidth))
-  val nonCritQueue = Module(new MshrQueue(nCores, nCmds, nMshrs, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, subBlockWidth, blockWidth))
+  if (enCritMisses) {
+    val critQueue = Module(new MshrQueue(nCores, nCmds, nMshrs, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, subBlockWidth, blockWidth))
+    val nonCritQueue = Module(new MshrQueue(nCores, nCmds, nMshrs, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, subBlockWidth, blockWidth))
 
-  // De-multiplex the push interface to the two queues
-  val mshrPushDemux = Module(new MshrPushDemux(nCores, nCmds, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, blockWidth))
+    // De-multiplex the push interface to the two queues
+    val mshrPushDemux = Module(new MshrPushDemux(nCores, nCmds, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, blockWidth))
 
-  mshrPushDemux.io.sel := io.pushCrit
-  mshrPushDemux.io.in <> io.push
-  nonCritQueue.io.push <> mshrPushDemux.io.out1
-  critQueue.io.push <> mshrPushDemux.io.out2
+    mshrPushDemux.io.sel := io.pushCrit
+    mshrPushDemux.io.in <> io.push
+    nonCritQueue.io.push <> mshrPushDemux.io.out1
+    critQueue.io.push <> mshrPushDemux.io.out2
 
-  // Multiplex between the two queues for popping
-  val mshrPopDemux = Module(new MshrPopMux(nCores, nCmds, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, blockWidth))
+    // Multiplex between the two queues for popping
+    val mshrPopDemux = Module(new MshrPopMux(nCores, nCmds, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, blockWidth))
 
-  // Choose to always pop the critical queue as long as it is not empty
-  mshrPopDemux.io.sel := io.popQSel
-  mshrPopDemux.io.in1 <> nonCritQueue.io.pop
-  mshrPopDemux.io.in2 <> critQueue.io.pop
-  io.pop <> mshrPopDemux.io.out
+    // Choose to always pop the critical queue as long as it is not empty
+    mshrPopDemux.io.sel := io.popQSel
+    mshrPopDemux.io.in1 <> nonCritQueue.io.pop
+    mshrPopDemux.io.in2 <> critQueue.io.pop
+    io.pop <> mshrPopDemux.io.out
 
-  io.critInfo <> critQueue.io.info
-  io.nonCritInfo <> nonCritQueue.io.info
+    io.critInfo <> critQueue.io.info
+    io.nonCritInfo <> nonCritQueue.io.info
 
-  // Since the critical queue is always given priority over non-critical queue, a hazards occurs when a replacement policy
-  // instructs a non-critical request to evict a way that then a critical request that has reached contention limit is
-  // told to evict too. For instance, a non-critical request can evict way 2, so it is pushed to non-critical fifo; then
-  // a critical request whose core has reached contention limit is told to evict the same way: 2 (most likely since any
-  // other ways are already owned by critical cores); then the critical way evicts this line first followed by a
-  // non-critical way evicting this line later on. This creates a additional contention, since if this line is later on
-  // needed by a critical core, it will have to refetch again, thus resulting in two line accesses from the main memory
-  // for a critical core.
-  // NOTE: This is a rather rare case.
+    // Since the critical queue is always given priority over non-critical queue, a hazards occurs when a replacement policy
+    // instructs a non-critical request to evict a way that then a critical request that has reached contention limit is
+    // told to evict too. For instance, a non-critical request can evict way 2, so it is pushed to non-critical fifo; then
+    // a critical request whose core has reached contention limit is told to evict the same way: 2 (most likely since any
+    // other ways are already owned by critical cores); then the critical way evicts this line first followed by a
+    // non-critical way evicting this line later on. This creates a additional contention, since if this line is later on
+    // needed by a critical core, it will have to refetch again, thus resulting in two line accesses from the main memory
+    // for a critical core.
+    // NOTE: This is a rather rare case.
 
-  val anyMatchingReqsInNonCrit = VecInit(Seq.fill(nMshrs)(false.B))
-  val critPopValid = !critQueue.io.pop.empty
-  for (mshrIdx <- 0 until nMshrs) {
-    val nonCritValid = nonCritQueue.io.info.validMSHRs(mshrIdx)
-    val conflict = critPopValid && nonCritValid && nonCritQueue.io.info.currentIndexes(mshrIdx) === critQueue.io.pop.popEntry.index && nonCritQueue.io.info.replacementWays(mshrIdx) === critQueue.io.pop.popEntry.replaceWay
-    anyMatchingReqsInNonCrit(mshrIdx) := conflict
+    val anyMatchingReqsInNonCrit = VecInit(Seq.fill(nMshrs)(false.B))
+    val critPopValid = !critQueue.io.pop.empty
+    for (mshrIdx <- 0 until nMshrs) {
+      val nonCritValid = nonCritQueue.io.info.validMshrs(mshrIdx)
+      val conflict = critPopValid && nonCritValid && nonCritQueue.io.info.currentIndexes(mshrIdx) === critQueue.io.pop.popEntry.index && nonCritQueue.io.info.replacementWays(mshrIdx) === critQueue.io.pop.popEntry.replaceWay
+      anyMatchingReqsInNonCrit(mshrIdx) := conflict
+    }
+
+    val queueConflict = anyMatchingReqsInNonCrit.reduce((x, y) => x || y)
+
+    io.full := critQueue.io.push.full || nonCritQueue.io.push.full
+    io.critEmpty := critQueue.io.pop.empty || queueConflict
+    io.nonCritEmpty := nonCritQueue.io.pop.empty
+  } else {
+    val nonCritQueue = Module(new MshrQueue(nCores, nCmds, nMshrs, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, subBlockWidth, blockWidth))
+
+    nonCritQueue.io.push <> io.push
+    io.pop <> nonCritQueue.io.pop
+
+    io.critInfo <> 0.U.asTypeOf(io.critInfo)
+    io.nonCritInfo <> nonCritQueue.io.info
+
+    io.full := nonCritQueue.io.push.full
+    io.critEmpty := true.B
+    io.nonCritEmpty := nonCritQueue.io.pop.empty
   }
-
-  val queueConflict = anyMatchingReqsInNonCrit.reduce((x, y) => x || y)
-
-  io.full := critQueue.io.push.full || nonCritQueue.io.push.full
-  io.critEmpty := critQueue.io.pop.empty || queueConflict
-  io.nonCritEmpty := nonCritQueue.io.pop.empty
 }

@@ -44,54 +44,64 @@ object ReplacementPolicyTest {
   }
 
   def performEvictionRequest(dut: PolicyTestWrapper, coreId: Int, setIdx: Int, expectedEvictionCandidate: Option[Int] = None): Unit = {
-    val expectedCandidate = expectedEvictionCandidate match {
-      case Some(data) => data.U
-      case None => 0.U
-    }
-
-    val evictionSetEmpty = expectedEvictionCandidate match {
-      case Some(_) => true.B
-      case None => false.B
-    }
-
-    // Make a request on behalf of the requesting core
+    // Make a request on behalf of the requesting core index
     dut.io.policy.control.setIdx.poke(setIdx.U)
 
     dut.clock.step() // Need a two clock cycle delay here since the base policy is separated from contention logic by two pipeline stage
 
     dut.io.policy.control.setIdx.poke(0.U)
+    dut.io.policy.control.coreId.poke(coreId.U)
+
+    dut.clock.step()
+
+    dut.io.policy.control.coreId.poke(0.U)
 
     dut.clock.step()
 
     dut.io.policy.control.evict.poke(true.B)
-    dut.io.policy.info.updateCoreId.poke(coreId.U)
 
-    dut.io.policy.control.isValid.expect(evictionSetEmpty)
+    dut.io.policy.control.isValid.expect(expectedEvictionCandidate.map(_ => true.B).getOrElse(false.B))
     if (expectedEvictionCandidate.isDefined) {
-      dut.io.policy.control.replaceWay.expect(expectedCandidate)
+      dut.io.policy.control.replaceWay.expect(expectedEvictionCandidate.map((x: Int) => x.U).getOrElse(0.U))
     }
 
-    dut.clock.step(1)
+    dut.clock.step()
 
-    dut.io.policy.info.updateCoreId.poke(0.U)
     dut.io.policy.control.evict.poke(false.B)
     dut.io.policy.control.setIdx.poke(0.U)
   }
 
-  def performUpdateRequest(dut: PolicyTestWrapper, coreId: Int, setIdx: Int, hitWay: Int): Unit = {
+  def performUpdateRequest(dut: PolicyTestWrapper, coreId: Int, setIdx: Int, hitWay: Int, expectedRepCandidate: Option[Int] = None, expectedSet: Option[Array[Int]] = None): Unit = {
+    // Make a request on behalf of the requesting core index
     dut.io.policy.control.setIdx.poke(setIdx.U)
 
-    dut.clock.step(2)
+    dut.clock.step() // Need a two clock cycle delay here since the base policy is separated from contention logic by two pipeline stage
 
-    dut.io.policy.control.update.valid.poke(true.B)
-    dut.io.policy.control.update.bits.poke(hitWay.U)
-    dut.io.policy.info.updateCoreId.poke(coreId.U)
+    dut.io.policy.control.setIdx.poke(0.U)
+    dut.io.policy.control.coreId.poke(coreId.U)
 
     dut.clock.step()
 
-    dut.io.policy.control.setIdx.poke(0.U)
-    dut.io.policy.control.update.valid.poke(false.B)
-    dut.io.policy.control.update.bits.poke(0.U)
-    dut.io.policy.info.updateCoreId.poke(0.U)
+    dut.io.policy.control.coreId.poke(0.U)
+    dut.io.policy.info.isHit.poke(true.B)
+    dut.io.policy.info.hitWay.poke(hitWay.U)
+
+    dut.clock.step()
+
+    dut.io.policy.info.isHit.poke(false.B)
+    dut.io.policy.info.hitWay.poke(0.U)
+    dut.io.policy.control.update.poke(true.B)
+
+    if (expectedRepCandidate.isDefined) {
+      dut.io.policy.control.replaceWay.expect(expectedRepCandidate.map((x: Int) => x.U).getOrElse(0.U))
+    }
+
+    if (expectedSet.isDefined) {
+      assertNumericalReplacementSet(dut, expectedSet.get)
+    }
+
+    dut.clock.step()
+
+    dut.io.policy.control.update.poke(false.B)
   }
 }

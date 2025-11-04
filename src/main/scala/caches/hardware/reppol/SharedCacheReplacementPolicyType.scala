@@ -30,31 +30,34 @@ class SchedulerControlIO(nCores: Int, dataWidth: Int) extends Bundle {
   val rData = Output(UInt(dataWidth.W))
 }
 
-class ReplacementPolicyInfoIO(nCores: Int, missQueueDepth: Int) extends Bundle {
+class ReplacementPolicyInfoIO(nWays: Int, missQueueDepth: Int) extends Bundle {
   val isHit = Input(Bool())
-  val updateCoreId = Input(UInt(log2Up(nCores).W))
-  val missQueueCores = Input(Vec(missQueueDepth, UInt(log2Up(nCores).W)))
-  val missQueueValidCores = Input(Vec(missQueueDepth, Bool()))
-  val nonCritWbPop = Input(Bool())
-  val nonCritWbEntryIsCrit = Input(Bool())
+  val hitWay = Input(UInt(log2Up(nWays).W))
+  val missQueueValidReqs = Input(Vec(missQueueDepth, Bool()))
+  val missQueueCritReqs = Input(Vec(missQueueDepth, Bool()))
+  val wbQueueValidReqs = Input(Vec(missQueueDepth, Bool()))
+  val wbQueueCritReqs = Input(Vec(missQueueDepth, Bool()))
   val isReplacementWayCrit = Output(Bool())
   val isReplacementWayAtLimit = Output(Bool())
   val updateCoreReachedLimit = Output(Bool())
   val updateCoreIsCrit = Output(Bool())
 }
 
-class ReplacementPolicyControlIO(nWays: Int, nSets: Int) extends Bundle {
+class ReplacementPolicyControlIO(nCores: Int, nWays: Int, nSets: Int) extends Bundle {
+  val valid = Input(Bool())
   val stall = Input(Bool())
   val evict = Input(Bool()) // Some policies may need to know if when the line is being evicted
-  val update = Input(Valid(UInt(log2Up(nWays).W)))
+  val update = Input(Bool())
+  val coreId = Input(UInt(log2Up(nCores).W))
   val setIdx = Input(UInt(log2Up(nSets).W))
   val isValid = Output(Bool()) // To signal if there are no valid ways to replace
   val replaceWay = Output(UInt(log2Up(nWays).W))
+  val insertBubble = Output(Bool()) // To signal that a bubble must be inserted
 }
 
 class SharedCacheReplacementIO(nWays: Int, nSets: Int, nCores: Int, schedulerDataWidth: Int, missQueueDepth: Int = 4) extends Bundle {
-  val control = new ReplacementPolicyControlIO(nWays, nSets)
-  val info = new ReplacementPolicyInfoIO(nCores, missQueueDepth)
+  val control = new ReplacementPolicyControlIO(nCores, nWays, nSets)
+  val info = new ReplacementPolicyInfoIO(nWays, missQueueDepth)
   val scheduler = new SchedulerControlIO(nCores, schedulerDataWidth)
 }
 
@@ -106,6 +109,10 @@ abstract class SharedCacheReplacementPolicyType(
       case MruFormat() => VecInit(Seq.fill(nWays)(0.U(1.W)))
     }
   }
+
+  def includeCriticalMissQ(): Boolean
+
+  def includeCriticalWbQ(): Boolean
 
   def printConfig(): Unit
 }

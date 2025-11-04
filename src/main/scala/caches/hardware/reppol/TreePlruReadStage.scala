@@ -43,7 +43,7 @@ class TreePlruReadStage(nWays: Int, nSets: Int, repSetFormat: BaseReplacementSet
   }
 
   override def getMruReplacementSet(state: UInt): Vec[UInt] = {
-    // TODO: Expand this to be more elaborate
+    // TODO: Expand this to return actual replacement set
     val mruRepSet = VecInit(Seq.fill(nWays)(0.U(1.W)))
     val oneHot = UIntToOH(getRepWay(state))
 

@@ -1,8 +1,11 @@
 package caches.hardware.reppol
 
 import chisel3._
+import chisel3.util.PriorityEncoder
 
 class BitPlruUpdateStage(nWays: Int) extends BasePolicyUpdateStageType(nWays, nWays) {
+  val newState = update(Mux(io.hit, io.hitWay, io.repWay), io.stateIn)
+
   override def update(hitWay: UInt, state: UInt): UInt = {
     val newMruBits = VecInit(Seq.fill(nWays)(false.B))
 
@@ -24,5 +27,11 @@ class BitPlruUpdateStage(nWays: Int) extends BasePolicyUpdateStageType(nWays, nW
     newMruBits.asUInt
   }
 
-  io.stateOut := update(io.hitWay, io.stateIn)
+  override def getRepWay(state: UInt): UInt = {
+    // Find the first 0 bit by inverting the bit registers and passing them to the priority encoder
+    PriorityEncoder((~state).asUInt)
+  }
+
+  io.stateOut := newState
+  io.repWayOut := getRepWay(newState)
 }
