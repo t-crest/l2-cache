@@ -71,7 +71,7 @@ jobs:
           mkdir -p local/bin
           cd hardware/config/
           sed -i '17i\<L2Cache size="64k" ways="8" bytesPerBlock="64" repl="plru" />' altde2-115.xml
-          sed -i '10s/.*/<!-- -->/' hardware/config/altde2-115.xml
+          sed -i '10s/.*/<!-- -->/' altde2-115.xml
           cd ../..
           make emulator
 
