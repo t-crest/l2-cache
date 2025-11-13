@@ -32,6 +32,13 @@ jobs:
           repository: t-crest/patmos
           path: patmos
 
+      # Checkout tacle benchmarks
+      - name: Checkout tacle benchmark repository
+        uses: actions/checkout@v3
+        with:
+          repository: tacle/tacle-bench
+          path: tacle
+
       # Install verilator
       - name: Setup verilator
         uses: v0xnihili/install-verilator-action@main
@@ -48,3 +55,65 @@ jobs:
       - name: Run sbt tests
         working-directory: ./l2-cache
         run: sbt test
+
+        # Build patmos emulator
+        # TODO: Better add an l2 config file in patmos
+      - name: Build patmos emulator
+        working-directory: ./patmos
+        run: |
+          cd hardware/config/
+          sed -i '17i\<L2Cache size="64k" ways="8" bytesPerBlock="64" repl="plru" />' altde2-115.xml
+          cd ../..
+          make emulator
+
+      - name: Verify patmos emulator
+        working-directory: ./tacle
+        run: ../local/patemu -h
+
+      - name: Run tacle benchmarks
+        working-directory: ./tacle/bench
+        run: |
+          COMPILER=patmos-clang
+          OPTIONS=" -Wall -Wno-unknown-pragmas -Werror -O2"
+          EXEC=pasim
+          PASS=0
+          FAIL_COMP=0
+          FAIL_EXEC=0
+
+          for dir in */ ; do
+              # Skip the 'parallel' directory entirely
+              [[ "$dir" == "parallel/" ]] && continue
+
+              printf "Entering ${dir}\n"
+              cd "$dir"
+
+              for BENCH in */ ; do
+                  # Skip certain subdirectories
+                  case "$dir$BENCH" in
+                      "kernel/pm/"| \
+                      "kernel/isqrt/"| \
+                      "kernel/fft/"| \
+                      "sequential/rijndael_dec/"| \
+                      "sequential/rijndael_enc/")
+                          echo "Skipping ${dir}${BENCH}"
+                          continue
+                          ;;
+                  esac
+
+                  printf "Checking ${dir}${BENCH}\n"
+                  cd "$BENCH"
+
+                  if [ -f a.out ]; then
+                      rm a.out
+                  fi
+
+                  if [ -f *.o ]; then
+                      rm *.o
+                  fi
+
+                  cd ..
+              done
+
+              printf "Leaving ${dir}\n\n"
+              cd ..
+          done
