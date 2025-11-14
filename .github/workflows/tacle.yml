@@ -31,7 +31,8 @@ jobs:
           path: t-crest/misc
 
       - name: Add path
-        run: echo "$HOME/t-crest/local/bin" >> $GITHUB_PATH
+        working-directory: t-crest/
+        run: echo "$PWD/local/bin" >> $GITHUB_PATH
 
       - name: Setup tools
         working-directory: t-crest/
@@ -40,17 +41,8 @@ jobs:
       - name: Verify patmos-clang
         run: patmos-clang --version
 
-      - name: Checkout l2-cache
-        uses: actions/checkout@v3
-        with:
-          path: t-crest/l2-cache
-
-#      # Checkout soc-comm
-#      - name: Checkout soc-comm repository
-#        uses: actions/checkout@v3
-#        with:
-#          repository: t-crest/soc-comm
-#          path: soc-comm
+      - name: Verify emulator
+        run: patemu -h
 
       # Checkout TACLe benchmarks
       - name: Checkout TACLe benchmark repository
@@ -58,17 +50,6 @@ jobs:
         with:
           repository: tacle/tacle-bench
           path: t-crest/tacle
-
-#      # Verify verilator installation
-#      - name: Validate verilator
-#        run: verilator --version
-#
-#      - name: Setup Scala
-#        uses: olafurpg/setup-scala@v14
-#
-#      - name: Run sbt tests
-#        working-directory: ./l2-cache
-#        run: sbt test
 
         # Build patmos emulator
         # TODO: Better add an l2 config file in patmos
