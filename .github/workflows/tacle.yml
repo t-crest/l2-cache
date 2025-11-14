@@ -16,6 +16,9 @@ jobs:
       - name: Install prerequisites
         run: sudo apt install git openjdk-11-jdk cmake make g++ texinfo flex bison subversion libelf-dev graphviz libboost-dev libboost-program-options-dev ruby-full chrpath liblpsolve55-dev zlib1g-dev gtkwave gtkterm scala autoconf libfl2 expect verilator curl
 
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v14
+
       - name: Checkout patmos-misc
         uses: actions/checkout@v3
         with:
