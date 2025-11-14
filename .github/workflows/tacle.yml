@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Install prerequisites
-        run: sudo apt install git openjdk-11-jdk cmake make g++ texinfo flex bison subversion libelf-dev graphviz libboost-dev libboost-program-options-dev ruby-full chrpath liblpsolve55-dev zlib1g-dev gtkwave gtkterm scala autoconf libfl2 expect verilator curl
+        run: sudo apt install openjdk-11-jdk cmake make subversion libelf-dev graphviz libboost-dev libboost-program-options-dev chrpath liblpsolve55-dev gtkwave gtkterm scala libfl2 expect verilator
 
       - name: Setup Scala
         uses: olafurpg/setup-scala@v14
@@ -38,7 +38,6 @@ jobs:
         working-directory: t-crest/
         run: ./misc/build.sh -q
 
-      # Checkout TACLe benchmarks
       - name: Checkout TACLe benchmark repository
         uses: actions/checkout@v3
         with:
@@ -47,7 +46,7 @@ jobs:
 
         # Build patmos emulator
         # TODO: Better add an l2 config file in patmos
-#      - name: Build patmos emulator
+#      - name: Build patmos emulator with L2
 #        working-directory: ./patmos
 #        run: |
 #          mkdir -p local/bin
@@ -56,10 +55,6 @@ jobs:
 #          sed -i '10s/.*/<!-- -->/' altde2-115.xml
 #          cd ../..
 #          make emulator
-#
-#      - name: Verify patmos emulator
-#        working-directory: ./tacle
-#        run: ../local/patemu -h
 
       - name: Verify patmos-clang
         run: patmos-clang --version
@@ -107,6 +102,8 @@ jobs:
                   if [ -f *.o ]; then
                       rm *.o
                   fi
+          
+                  $COMPILER $COMPILER_OPTIONS *.c
           
                   if [ -f a.out ]; then
                       $EXEC ./a.out &>/dev/null
