@@ -35,7 +35,7 @@ jobs:
 
       - name: Setup tools
         working-directory: t-crest/
-        run: ./misc/build.sh -q llvm2 patmos
+        run: ./misc/build.sh -q llvm2 patmos soc-comm
 
       - name: Verify patmos-clang
         run: patmos-clang --version
