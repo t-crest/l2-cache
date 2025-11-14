@@ -19,6 +19,11 @@ jobs:
       - name: Setup Scala
         uses: olafurpg/setup-scala@v14
 
+      - name: Checkout L2 cache
+        uses: actions/checkout@v3
+        with:
+          path: l2-cache
+
       - name: Checkout patmos-misc
         uses: actions/checkout@v3
         with:
