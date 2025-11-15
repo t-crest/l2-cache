@@ -115,7 +115,7 @@ jobs:
           ls -a
 
       - name: Add toolchain to PATH
-        run: echo "$PWD/artifacts" >> $GITHUB_PATH
+        run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
 
       - name: Verify patmos-clang
         run: patmos-clang --version
@@ -307,7 +307,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-tools
-          path: artifacts/bin
+          path: artifacts/
 
       - name: Add toolchain to PATH
         run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
