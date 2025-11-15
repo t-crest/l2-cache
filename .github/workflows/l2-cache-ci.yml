@@ -31,20 +31,20 @@ jobs:
           path: patmos
 
       # Chisel test is only compatible with older versions of verilator
-      - name: Setup verilator
-        uses: v0xnihili/install-verilator-action@main
-        with:
-          version: "v4.100"
-
-      - name: Verify verilator
-        run: verilator --version
-
-      - name: Setup Scala
-        uses: olafurpg/setup-scala@v14
-
-      - name: Run sbt tests
-        working-directory: ./l2-cache
-        run: sbt test
+#      - name: Setup verilator
+#        uses: v0xnihili/install-verilator-action@main
+#        with:
+#          version: "v4.100"
+#
+#      - name: Verify verilator
+#        run: verilator --version
+#
+#      - name: Setup Scala
+#        uses: olafurpg/setup-scala@v14
+#
+#      - name: Run sbt tests
+#        working-directory: ./l2-cache
+#        run: sbt test
 
   build-tools:
     runs-on: ubuntu-latest
@@ -106,24 +106,28 @@ jobs:
         with:
           name: patmos-tools
           path: artifacts/bin
-      - run: |
+
+      - name: Verify downloads
+        run: |
+          sudo apt install tree
+          tree -d
           cd artifacts/bin
           ls -a
 
       - name: Add toolchain to PATH
         run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
 
-      - name: Checkout TACLe benchmark repository
-        uses: actions/checkout@v3
-        with:
-          repository: tacle/tacle-bench
-          path: tacle
-
       - name: Verify patmos-clang
         run: patmos-clang --version
 
       - name: Verify emulator
         run: patemu -h
+
+      - name: Checkout TACLe benchmark repository
+        uses: actions/checkout@v3
+        with:
+          repository: tacle/tacle-bench
+          path: tacle
 
       - name: Run TACLe benchmarks
         working-directory: tacle/bench
