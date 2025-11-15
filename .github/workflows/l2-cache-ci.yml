@@ -105,6 +105,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-tools
+          path: artifacts/bin
+      - run: |
+          cd artifacts/bin
+          ls -a
 
       - name: Add toolchain to PATH
         run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
@@ -299,6 +303,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-tools
+          path: artifacts/bin
 
       - name: Add toolchain to PATH
         run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
