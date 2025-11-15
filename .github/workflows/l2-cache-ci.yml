@@ -107,12 +107,11 @@ jobs:
           name: patmos-tools
           path: artifacts/
 
-      - name: Verify downloads
+      - name: Re add execution permission to downloads
         run: |
-          sudo apt install tree
-          tree -d
-          cd artifacts/
-          ls -a
+          cd artifacts/bin
+          sudo chmod +x ./patmos-clang
+          sudo chmod +x ./patemu
 
       - name: Add toolchain to PATH
         run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
@@ -308,6 +307,12 @@ jobs:
         with:
           name: patmos-tools
           path: artifacts/
+
+      - name: Re add execution permission to downloads
+        run: |
+          cd artifacts/bin
+          sudo chmod +x ./patmos-clang
+          sudo chmod +x ./patemu
 
       - name: Add toolchain to PATH
         run: echo "$PWD/artifacts/bin" >> $GITHUB_PATH
