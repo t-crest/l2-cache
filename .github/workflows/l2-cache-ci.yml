@@ -74,7 +74,7 @@ jobs:
 
       - name: Setup tools
         working-directory: t-crest/
-        run: ./misc/build.sh -q simulator llvm2 argo soc-comm patmos bench
+        run: ./misc/build.sh -q simulator llvm2 argo soc-comm poseidon patmos bench
 
 #      # TODO: Better add an l2 config file in patmos
 #      - name: Build patmos emulator with L2 cache
