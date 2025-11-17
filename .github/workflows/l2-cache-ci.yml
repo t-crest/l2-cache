@@ -89,6 +89,7 @@ jobs:
         run: |
           mkdir artifacts
           mkdir -p t-crest/bench
+          touch t-crest/bench/temp.txt 
           cp -vr t-crest/local artifacts/
           cp -vr t-crest/misc artifacts/
           cp -vr t-crest/bench artifacts/
