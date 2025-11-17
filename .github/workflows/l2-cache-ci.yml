@@ -297,4 +297,4 @@ jobs:
         run: |
           sed -i '328c\    set_tests_properties(${name}_hw PROPERTIES TIMEOUT 18000)' t-crest/bench/cmake/patmos-clang-toolchain.cmake
           cd t-crest/bench/build
-          make
+          make test
