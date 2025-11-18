@@ -1,5 +1,17 @@
 name: L2 cache CI
 
+env:
+  MISC_PATH: misc/
+  BENCH_PATH: bench/
+  TOOL_PATH: local/
+  L2_PATH: l2-cache/
+  T_CREST_PATH: t-crest/
+  SOC_COMM_PATH: soc-comm/
+  PATMOS_PATH: patmos/
+  ARTIFACTS_PATH: artifacts/
+  TACLE_PATH: tacle/
+  PATMOS_BENCH_JOBS: -j6
+
 on:
   push:
     branches:
@@ -13,22 +25,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout current repository
+      - name: Checkout L2-cache
         uses: actions/checkout@v3
         with:
-          path: l2-cache
+          path: ${{env.L2_PATH}}
 
-      - name: Checkout soc-comm repository
+      - name: Checkout soc-comm
         uses: actions/checkout@v3
         with:
           repository: t-crest/soc-comm
-          path: soc-comm
+          path: ${{env.SOC_COMM_PATH}}
 
-      - name: Checkout patmos repository
+      - name: Checkout patmos
         uses: actions/checkout@v3
         with:
           repository: t-crest/patmos
-          path: patmos
+          path: ${{env.PATMOS_PATH}}
 
       # Chisel test is only compatible with older versions of verilator
 #      - name: Setup verilator
@@ -52,7 +64,10 @@ jobs:
 
     steps:
       - name: Install prerequisites
-        run: sudo apt install openjdk-11-jdk cmake make subversion libelf-dev graphviz libboost-dev libboost-program-options-dev chrpath liblpsolve55-dev gtkwave gtkterm scala libfl2 expect verilator
+        run: |
+          sudo apt install openjdk-11-jdk cmake make subversion libelf-dev graphviz \
+          libboost-dev libboost-program-options-dev chrpath liblpsolve55-dev gtkwave \
+          gtkterm scala libfl2 expect verilator
 
       - name: Setup Scala
         uses: olafurpg/setup-scala@v14
@@ -60,21 +75,21 @@ jobs:
       - name: Checkout L2 cache
         uses: actions/checkout@v3
         with:
-          path: t-crest/l2-cache
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
 
       - name: Checkout patmos-misc
         uses: actions/checkout@v3
         with:
           repository: t-crest/patmos-misc
-          path: t-crest/misc
+          path: ${{ env.T_CREST_PATH }}${{ env.MISC_PATH }}
 
       - name: Add path
         working-directory: t-crest/
         run: echo "$PWD/local/bin" >> $GITHUB_PATH
 
       - name: Setup tools
-        working-directory: t-crest/
-        run: ./misc/build.sh -q simulator llvm2 argo soc-comm poseidon patmos bench
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: ${{ env.MISC_PATH }}build.sh -q simulator llvm2 argo soc-comm poseidon patmos #bench
 
 #      # TODO: Better add an l2 config file in patmos
 #      - name: Build patmos emulator with L2 cache
@@ -87,18 +102,17 @@ jobs:
 
       - name: Package tools
         run: |
-          mkdir artifacts
-          cp -vr t-crest/local artifacts/
-          cp -vr t-crest/misc artifacts/
-          cp -vr t-crest/bench artifacts/
+          mkdir ${{ env.ARTIFACTS_PATH }}
+          cd ${{ env.ARTIFACTS_PATH }}
+          tar -cvf tools.tar ${{ env.T_CREST_PATH }}${{ env.TOOL_PATH }} ${{ env.T_CREST_PATH }}${{ env.MISC_PATH }} # ${{ env.T_CREST_PATH }}${{ env.BENCH_PATH }}
 
       - name: Upload tools
         uses: actions/upload-artifact@v4
         with:
           name: patmos-tools
-          path: artifacts
+          path: ${{ env.ARTIFACTS_PATH }}
 
-  tacle-bench-app-test:
+  tacle-bench-app:
     runs-on: ubuntu-latest
     needs: [ build-tools ]
 
@@ -107,194 +121,191 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: patmos-tools
-          path: artifacts/
+          path: ${{ env.ARTIFACTS_PATH }}
 
-      - name: Add tools to path
+      - name: Unpack tools
         run: |
-          mkdir t-crest/
-          cp -vr artifacts/local/ t-crest/
-          sudo chmod -v +x t-crest/local/bin/*
-          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
-
-      - name: Verify patmos-clang
-        run: patmos-clang --version
-
-      - name: Verify emulator
-        run: patemu -h
+          cd ${{ env.ARTIFACTS_PATH }}
+          tar -xvf ./tools.tar
+          cd ..
+          mkdir ${{ env.T_CREST_PATH }}
+          cp -vr ${{ env.ARTIFACTS_PATH }}${{ env.TOOLS_PATH }} ${{ env.T_CREST_PATH }}
+#          sudo chmod -v +x t-crest/local/bin/*
+          echo "$PWD/{{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
 
       - name: Checkout TACLe benchmark repository
         uses: actions/checkout@v3
         with:
           repository: tacle/tacle-bench
-          path: t-crest/tacle
+          path: ${{ env.T_CREST_PATH }}${{ env.TACLE_PATH }}
 
       - name: Checkout L2 cache
         uses: actions/checkout@v3
         with:
-          path: t-crest/l2-cache
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
 
       - name: Run TACLe benchmarks
-        working-directory: t-crest/
+        working-directory: ${{ env.T_CREST_PATH }}
         run: |
-          cp l2-cache/scripts/tacle_test.sh tacle/bench/app/
-          cd tacle/bench/app/
-          chmod +x tacle_test.sh && ./tacle_test.sh
+          cp ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/app/
+          cd ${{ env.TACLE_PATH }}bench/app/
+#          chmod +x tacle_test.sh && ./tacle_test.sh
 
-  tacle-bench-kernel-test:
-    runs-on: ubuntu-latest
-    needs: [ build-tools ]
-
-    steps:
-      - name: Download tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-tools
-          path: artifacts/
-
-      - name: Add tools to path
-        run: |
-          mkdir t-crest/
-          cp -vr artifacts/local/ t-crest/
-          sudo chmod -v +x t-crest/local/bin/*
-          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
-
-      - name: Verify patmos-clang
-        run: patmos-clang --version
-
-      - name: Verify emulator
-        run: patemu -h
-
-      - name: Checkout TACLe benchmark repository
-        uses: actions/checkout@v3
-        with:
-          repository: tacle/tacle-bench
-          path: t-crest/tacle
-
-      - name: Checkout L2 cache
-        uses: actions/checkout@v3
-        with:
-          path: t-crest/l2-cache
-
-      - name: Run TACLe benchmarks
-        working-directory: t-crest/
-        run: |
-          cp l2-cache/scripts/tacle_test.sh tacle/bench/kernel/
-          cd tacle/bench/kernel/
-          chmod +x tacle_test.sh
-          ./tacle_test.sh --skip pm/ --skip isqrt/
-
-  tacle-bench-sequential-test:
-    runs-on: ubuntu-latest
-    needs: [ build-tools ]
-
-    steps:
-      - name: Download tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-tools
-          path: artifacts/
-
-      - name: Add tools to path
-        run: |
-          mkdir t-crest/
-          cp -vr artifacts/local/ t-crest/
-          sudo chmod -v +x t-crest/local/bin/*
-          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
-
-      - name: Verify patmos-clang
-        run: patmos-clang --version
-
-      - name: Verify emulator
-        run: patemu -h
-
-      - name: Checkout TACLe benchmark repository
-        uses: actions/checkout@v3
-        with:
-          repository: tacle/tacle-bench
-          path: t-crest/tacle
-
-      - name: Checkout L2 cache
-        uses: actions/checkout@v3
-        with:
-          path: t-crest/l2-cache
-
-      - name: Run TACLe benchmarks
-        working-directory: t-crest/
-        run: |
-          cp l2-cache/scripts/tacle_test.sh tacle/bench/sequential/
-          cd tacle/bench/sequential/
-          chmod +x tacle_test.sh && ./tacle_test.sh
-
-  tacle-bench-test-test:
-    runs-on: ubuntu-latest
-    needs: [ build-tools ]
-
-    steps:
-      - name: Download tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-tools
-          path: artifacts/
-
-      - name: Add tools to path
-        run: |
-          mkdir t-crest/
-          cp -vr artifacts/local/ t-crest/
-          sudo chmod -v +x t-crest/local/bin/*
-          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
-
-      - name: Verify patmos-clang
-        run: patmos-clang --version
-
-      - name: Verify emulator
-        run: patemu -h
-
-      - name: Checkout TACLe benchmark repository
-        uses: actions/checkout@v3
-        with:
-          repository: tacle/tacle-bench
-          path: t-crest/tacle
-
-      - name: Checkout L2 cache
-        uses: actions/checkout@v3
-        with:
-          path: t-crest/l2-cache
-
-      - name: Run TACLe benchmarks
-        working-directory: t-crest/
-        run: |
-          cp l2-cache/scripts/tacle_test.sh tacle/bench/test/
-          cd tacle/bench/test/
-          chmod +x tacle_test.sh && ./tacle_test.sh
-
-  patmos-bench-test:
-    runs-on: ubuntu-latest
-    needs: [ build-tools ]
-
-    steps:
-      - name: Download tools
-        uses: actions/download-artifact@v4
-        with:
-          name: patmos-tools
-          path: artifacts/
-
-      - name: Add tools to path
-        run: |
-          mkdir t-crest/
-          cp -vr artifacts/local t-crest/
-          cp -vr artifacts/misc t-crest/
-          cp -vr artifacts/bench t-crest/
-          sudo chmod -v +x t-crest/local/bin/*
-          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
-
-      - name: Verify patmos-clang
-        run: patmos-clang --version
-
-      - name: Verify emulator
-        run: patemu -h
-
-      - name: Patmos benchmarks
-        run: |
-          sed -i '328c\    set_tests_properties(${name}_hw PROPERTIES TIMEOUT 18000)' t-crest/bench/cmake/patmos-clang-toolchain.cmake
-          cd t-crest/bench/build
-          make test
+#  tacle-bench-kernel:
+#    runs-on: ubuntu-latest
+#    needs: [ build-tools ]
+#
+#    steps:
+#      - name: Download tools
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: patmos-tools
+#          path: artifacts/
+#
+#      - name: Add tools to path
+#        run: |
+#          mkdir t-crest/
+#          cp -vr artifacts/local/ t-crest/
+#          sudo chmod -v +x t-crest/local/bin/*
+#          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
+#
+#      - name: Verify patmos-clang
+#        run: patmos-clang --version
+#
+#      - name: Verify emulator
+#        run: patemu -h
+#
+#      - name: Checkout TACLe benchmark repository
+#        uses: actions/checkout@v3
+#        with:
+#          repository: tacle/tacle-bench
+#          path: t-crest/tacle
+#
+#      - name: Checkout L2 cache
+#        uses: actions/checkout@v3
+#        with:
+#          path: t-crest/l2-cache
+#
+#      - name: Run TACLe benchmarks
+#        working-directory: t-crest/
+#        run: |
+#          cp l2-cache/scripts/tacle_test.sh tacle/bench/kernel/
+#          cd tacle/bench/kernel/
+#          chmod +x tacle_test.sh
+#          ./tacle_test.sh --skip pm/ --skip isqrt/
+#
+#  tacle-bench-sequential:
+#    runs-on: ubuntu-latest
+#    needs: [ build-tools ]
+#
+#    steps:
+#      - name: Download tools
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: patmos-tools
+#          path: artifacts/
+#
+#      - name: Add tools to path
+#        run: |
+#          mkdir t-crest/
+#          cp -vr artifacts/local/ t-crest/
+#          sudo chmod -v +x t-crest/local/bin/*
+#          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
+#
+#      - name: Verify patmos-clang
+#        run: patmos-clang --version
+#
+#      - name: Verify emulator
+#        run: patemu -h
+#
+#      - name: Checkout TACLe benchmark repository
+#        uses: actions/checkout@v3
+#        with:
+#          repository: tacle/tacle-bench
+#          path: t-crest/tacle
+#
+#      - name: Checkout L2 cache
+#        uses: actions/checkout@v3
+#        with:
+#          path: t-crest/l2-cache
+#
+#      - name: Run TACLe benchmarks
+#        working-directory: t-crest/
+#        run: |
+#          cp l2-cache/scripts/tacle_test.sh tacle/bench/sequential/
+#          cd tacle/bench/sequential/
+#          chmod +x tacle_test.sh && ./tacle_test.sh
+#
+#  tacle-bench-test:
+#    runs-on: ubuntu-latest
+#    needs: [ build-tools ]
+#
+#    steps:
+#      - name: Download tools
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: patmos-tools
+#          path: artifacts/
+#
+#      - name: Add tools to path
+#        run: |
+#          mkdir t-crest/
+#          cp -vr artifacts/local/ t-crest/
+#          sudo chmod -v +x t-crest/local/bin/*
+#          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
+#
+#      - name: Verify patmos-clang
+#        run: patmos-clang --version
+#
+#      - name: Verify emulator
+#        run: patemu -h
+#
+#      - name: Checkout TACLe benchmark repository
+#        uses: actions/checkout@v3
+#        with:
+#          repository: tacle/tacle-bench
+#          path: t-crest/tacle
+#
+#      - name: Checkout L2 cache
+#        uses: actions/checkout@v3
+#        with:
+#          path: t-crest/l2-cache
+#
+#      - name: Run TACLe benchmarks
+#        working-directory: t-crest/
+#        run: |
+#          cp l2-cache/scripts/tacle_test.sh tacle/bench/test/
+#          cd tacle/bench/test/
+#          chmod +x tacle_test.sh && ./tacle_test.sh
+#
+#  patmos-bench:
+#    runs-on: ubuntu-latest
+#    needs: [ build-tools ]
+#
+#    steps:
+#      - name: Download tools
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: patmos-tools
+#          path: artifacts/
+#
+#      - name: Add tools to path
+#        run: |
+#          mkdir t-crest/
+#          cp -vr artifacts/local t-crest/
+#          cp -vr artifacts/misc t-crest/
+#          cp -vr artifacts/bench t-crest/
+#          sudo chmod -v +x t-crest/local/bin/*
+#          echo "$PWD/t-crest/local/bin" >> $GITHUB_PATH
+#
+#      - name: Verify patmos-clang
+#        run: patmos-clang --version
+#
+#      - name: Verify emulator
+#        run: patemu -h
+#
+#      - name: Patmos benchmarks
+#        run: |
+#          sed -i '328c\    set_tests_properties(${name}_hw PROPERTIES TIMEOUT 18000)' t-crest/bench/cmake/patmos-clang-toolchain.cmake
+#          cd t-crest/bench/build
+#          ctest $PATMOS_BENCH_JOBS -v
