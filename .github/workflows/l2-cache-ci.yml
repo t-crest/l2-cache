@@ -128,9 +128,10 @@ jobs:
         run: |
           cd ${{ env.ARTIFACTS_PATH }}
           tar -xvf ./tools.tar
+          tree -d
           cd ..
-          mkdir ${{ env.T_CREST_PATH }}
-          cp -vr ${{ env.ARTIFACTS_PATH }}${{ env.TOOLS_PATH }} ${{ env.T_CREST_PATH }}
+          mkdir -v ${{ env.T_CREST_PATH }}
+#          cp -vr ${{ env.ARTIFACTS_PATH }}${{ env.TOOLS_PATH }} ${{ env.T_CREST_PATH }}
           echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
 
       - name: Checkout TACLe benchmark repository
