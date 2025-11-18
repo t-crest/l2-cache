@@ -143,9 +143,9 @@ jobs:
       - name: Run TACLe benchmarks
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
-          cp ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/app/
-          cd ${{ env.TACLE_PATH }}bench/app/
-          ./tacle_test.sh
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/app/
+          cd -v ${{ env.TACLE_PATH }}bench/app/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
 
   tacle-bench-kernel:
     runs-on: ubuntu-latest
@@ -177,9 +177,9 @@ jobs:
       - name: Run TACLe benchmarks
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
-          cp ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/kernel/
-          cd ${{ env.TACLE_PATH }}bench/kernel/
-          ./tacle_test.sh --skip pm/ --skip isqrt/
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/kernel/
+          cd -v ${{ env.TACLE_PATH }}bench/kernel/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh --skip pm/ --skip isqrt/
 
   tacle-bench-sequential:
     runs-on: ubuntu-latest
@@ -211,9 +211,9 @@ jobs:
       - name: Run TACLe benchmarks
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
-          cp ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/sequential/
-          cd ${{ env.TACLE_PATH }}bench/sequential/
-          ./tacle_test.sh
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/sequential/
+          cd -v ${{ env.TACLE_PATH }}bench/sequential/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
 
   tacle-bench-test:
     runs-on: ubuntu-latest
@@ -245,9 +245,9 @@ jobs:
       - name: Run TACLe benchmarks
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
-          cp ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/test/
-          cd ${{ env.TACLE_PATH }}bench/test/
-          ./tacle_test.sh
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/test/
+          cd -v ${{ env.TACLE_PATH }}bench/test/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
 #
 #  patmos-bench:
 #    runs-on: ubuntu-latest
