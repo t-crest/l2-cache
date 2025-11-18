@@ -131,7 +131,6 @@ jobs:
           tree -d
           cd ..
           mkdir -v ${{ env.T_CREST_PATH }}
-#          cp -vr ${{ env.ARTIFACTS_PATH }}${{ env.TOOLS_PATH }} ${{ env.T_CREST_PATH }}
           echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
 
       - name: Checkout TACLe benchmark repository
@@ -310,4 +309,7 @@ jobs:
 #          sed -i '328c\    set_tests_properties(${name}_hw PROPERTIES TIMEOUT 18000)' t-crest/bench/cmake/patmos-clang-toolchain.cmake
 #          cd t-crest/bench/build
 #          ctest $PATMOS_BENCH_JOBS -v
+
 #          sudo chmod -v +x t-crest/local/bin/*
+
+#          cp -vr ${{ env.ARTIFACTS_PATH }}${{ env.TOOLS_PATH }} ${{ env.T_CREST_PATH }}
