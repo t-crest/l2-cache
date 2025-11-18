@@ -94,12 +94,19 @@ jobs:
 
 #      # TODO: Better add an l2 config file in patmos
 #      - name: Build patmos emulator with L2 cache
-#        working-directory: t-crest/
+#        working-directory: ${{ env.T_CREST_PATH }}
 #        run: |
-#          cd patmos/
+#          cd ${{ env.PATMOS_PATH }}
 #          sed -i '17i\<L2Cache size="64k" ways="8" bytesPerBlock="64" repl="plru" />' hardware/config/altde2-115.xml
 #          cat hardware/config/altde2-115.xml
 #          make emulator
+#
+#      - name: Re-build bench with increased timeout
+#        working-directory: ${{ env.T_CREST_PATH }}
+#        run: |
+#          sed -i '328c\    set_tests_properties(${name}_hw PROPERTIES TIMEOUT 18000)' ${{ env.BENCH_PATH }}/cmake/patmos-clang-toolchain.cmake
+#          cd ${{ env.BENCH_PATH }}build
+#          make
 
       - name: Package tools
         run: |
@@ -144,7 +151,7 @@ jobs:
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
           cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/app/
-          cd -v ${{ env.TACLE_PATH }}bench/app/
+          cd ${{ env.TACLE_PATH }}bench/app/
           sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
 
   tacle-bench-kernel:
@@ -178,7 +185,7 @@ jobs:
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
           cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/kernel/
-          cd -v ${{ env.TACLE_PATH }}bench/kernel/
+          cd ${{ env.TACLE_PATH }}bench/kernel/
           sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh --skip pm/ --skip isqrt/
 
   tacle-bench-sequential:
@@ -212,7 +219,7 @@ jobs:
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
           cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/sequential/
-          cd -v ${{ env.TACLE_PATH }}bench/sequential/
+          cd ${{ env.TACLE_PATH }}bench/sequential/
           sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
 
   tacle-bench-test:
@@ -246,7 +253,7 @@ jobs:
         working-directory: ${{ env.T_CREST_PATH }}
         run: |
           cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/test/
-          cd -v ${{ env.TACLE_PATH }}bench/test/
+          cd ${{ env.TACLE_PATH }}bench/test/
           sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
 #
 #  patmos-bench:
