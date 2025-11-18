@@ -126,11 +126,9 @@ jobs:
 
       - name: Unpack tools
         run: |
-          cd ${{ env.ARTIFACTS_PATH }}
-          tar -xvf ./tools.tar
+          tar -xvf ${{ env.ARTIFACTS_PATH }}tools.tar
           tree -d
           cd ..
-          mkdir -v ${{ env.T_CREST_PATH }}
           echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
 
       - name: Checkout TACLe benchmark repository
