@@ -18,7 +18,7 @@ env:
   PATMOS_PATH: patmos/
   ARTIFACTS_PATH: artifacts/
   TACLE_PATH: tacle/
-  PATMOS_BENCH_JOBS: -j6
+  PATMOS_BENCH_JOBS: 6
 
 jobs:
   scala-test:
@@ -275,4 +275,4 @@ jobs:
       - name: Patmos benchmarks
         run: |
           cd ${{ env.T_CREST_PATH }}${{ env.BENCH_PATH }}
-          ctest $PATMOS_BENCH_JOBS -v
+          ctest -j${{ env.PATMOS_BENCH_JOBS }} -v
