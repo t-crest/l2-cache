@@ -77,6 +77,6 @@ done
 
 echo "PASS: $PASS, FAIL_COMP: $FAIL_COMP, FAIL_EXEC: $FAIL_EXEC"
 
-if (( FAIL_EXEC > 0 )); then
+if (( FAIL_EXEC > 0 || FAIL_COMP > 0)); then
     exit 1
 fi

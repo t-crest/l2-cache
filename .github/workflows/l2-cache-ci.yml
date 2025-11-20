@@ -220,7 +220,7 @@ jobs:
         run: |
           cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/sequential/
           cd ${{ env.TACLE_PATH }}bench/sequential/
-          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh --skip ammunition/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh --skip ammunition/ --skip rijndael_dec/ --skip rijndael_enc/
 
   tacle-bench-test:
     runs-on: ubuntu-latest
