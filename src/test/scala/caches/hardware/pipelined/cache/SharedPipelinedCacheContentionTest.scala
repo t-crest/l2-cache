@@ -19,8 +19,7 @@ class SharedPipelinedCacheContentionTest extends AnyFlatSpec with ChiselScalates
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1100,
-        printResults = PRINT_RESULTS
+        1100
       )
 
       dut.clock.step()

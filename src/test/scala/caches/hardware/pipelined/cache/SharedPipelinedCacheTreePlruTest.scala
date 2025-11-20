@@ -18,8 +18,7 @@ class SharedPipelinedCacheTreePlruTest extends AnyFlatSpec with ChiselScalatestT
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1000,
-        printResults = PRINT_RESULTS
+        1000
       )
 
       dut.clock.step()

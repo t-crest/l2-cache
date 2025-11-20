@@ -78,7 +78,7 @@ class TimeoutReplacementPolicy(
     s"replacement set format: ${repSetFormat.getName}, " +
     s"ways: $nWays, " +
     s"sets: $nSets, " +
-    s"cores: $nCores" + "\n"
+    s"cores: $nCores"
   )
 
   override def includeCriticalMissQ(): Boolean = true

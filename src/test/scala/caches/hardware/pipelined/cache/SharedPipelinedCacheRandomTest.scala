@@ -122,8 +122,7 @@ class SharedPipelinedCacheRandomTest extends AnyFlatSpec with ChiselScalatestTes
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        35500,
-        printResults = true
+        35500
       )
 
       dut.clock.step()
@@ -159,8 +158,7 @@ class SharedPipelinedCacheRandomTest extends AnyFlatSpec with ChiselScalatestTes
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        3500,
-        printResults = true
+        3500
       )
 
       dut.clock.step()

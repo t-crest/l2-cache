@@ -1,0 +1,278 @@
+name: L2 CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  schedule:
+    - cron: '00 1 * * MON'
+
+env:
+  MISC_PATH: misc/
+  BENCH_PATH: bench/
+  TOOLS_PATH: local/
+  L2_PATH: l2-cache/
+  T_CREST_PATH: t-crest/
+  SOC_COMM_PATH: soc-comm/
+  PATMOS_PATH: patmos/
+  ARTIFACTS_PATH: artifacts/
+  TACLE_PATH: tacle/
+  PATMOS_BENCH_JOBS: 6
+
+jobs:
+  scala-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout L2-cache
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+
+      - name: Checkout soc-comm
+        uses: actions/checkout@v3
+        with:
+          repository: t-crest/soc-comm
+          path: ${{ env.T_CREST_PATH }}${{ env.SOC_COMM_PATH }}
+
+      - name: Checkout patmos
+        uses: actions/checkout@v3
+        with:
+          repository: t-crest/patmos
+          path: ${{ env.T_CREST_PATH }}${{ env.PATMOS_PATH }}
+
+      # Chisel test is only compatible with older versions of verilator
+      - name: Setup verilator
+        uses: v0xnihili/install-verilator-action@main
+        with:
+          version: "v4.100"
+
+      - name: Verify verilator
+        run: verilator --version
+
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v14
+
+      - name: Run sbt tests
+        working-directory: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+        run: sbt test
+
+  build-tools:
+    runs-on: ubuntu-latest
+    needs: [scala-test]
+
+    steps:
+      - name: Install prerequisites
+        run: |
+          sudo apt update
+          sudo apt install openjdk-11-jdk cmake make subversion libelf-dev graphviz \
+          libboost-dev libboost-program-options-dev chrpath liblpsolve55-dev gtkwave \
+          gtkterm scala libfl2 expect verilator
+
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v14
+
+      - name: Checkout L2 cache
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+
+      - name: Checkout patmos-misc
+        uses: actions/checkout@v3
+        with:
+          repository: t-crest/patmos-misc
+          path: ${{ env.T_CREST_PATH }}${{ env.MISC_PATH }}
+
+      - name: Add path
+        working-directory: t-crest/
+        run: echo "$PWD/${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
+
+      - name: Setup tools
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: ${{ env.MISC_PATH }}build.sh -q simulator llvm2 argo soc-comm poseidon patmos bench
+
+      # TODO: Better add an l2 config file in patmos
+      - name: Build patmos emulator with L2 cache
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: |
+          cd ${{ env.PATMOS_PATH }}
+          sed -i '17i\<L2Cache size="64k" ways="8" bytesPerBlock="64" repl="plru" />' hardware/config/altde2-115.xml
+          cat hardware/config/altde2-115.xml
+          make emulator
+
+      - name: Re-build bench with increased timeout
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: |
+          sed -i '328c\    set_tests_properties(${name}_hw PROPERTIES TIMEOUT 18000)' ${{ env.BENCH_PATH }}cmake/patmos-clang-toolchain.cmake
+          cd ${{ env.BENCH_PATH }}build
+          make
+
+      - name: Package tools
+        run: |
+          mkdir ${{ env.ARTIFACTS_PATH }}
+          cd ${{ env.ARTIFACTS_PATH }}
+          tar -cvf tools.tar ../${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }} ../${{ env.T_CREST_PATH }}${{ env.MISC_PATH }} ../${{ env.T_CREST_PATH }}${{ env.BENCH_PATH }}
+
+      - name: Upload tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: patmos-tools
+          path: ${{ env.ARTIFACTS_PATH }}
+
+  tacle-bench-app:
+    runs-on: ubuntu-latest
+    needs: [ build-tools ]
+
+    steps:
+      - name: Download tools
+        uses: actions/download-artifact@v4
+        with:
+          name: patmos-tools
+          path: ${{ env.ARTIFACTS_PATH }}
+
+      - name: Unpack tools
+        run: |
+          tar -xvf ${{ env.ARTIFACTS_PATH }}tools.tar
+          echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
+
+      - name: Checkout TACLe benchmark repository
+        uses: actions/checkout@v3
+        with:
+          repository: tacle/tacle-bench
+          path: ${{ env.T_CREST_PATH }}${{ env.TACLE_PATH }}
+
+      - name: Checkout L2 cache
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+
+      - name: Run TACLe benchmarks
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: |
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/app/
+          cd ${{ env.TACLE_PATH }}bench/app/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
+
+  tacle-bench-kernel:
+    runs-on: ubuntu-latest
+    needs: [ build-tools ]
+
+    steps:
+      - name: Download tools
+        uses: actions/download-artifact@v4
+        with:
+          name: patmos-tools
+          path: ${{ env.ARTIFACTS_PATH }}
+
+      - name: Unpack tools
+        run: |
+          tar -xvf ${{ env.ARTIFACTS_PATH }}tools.tar
+          echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
+
+      - name: Checkout TACLe benchmark repository
+        uses: actions/checkout@v3
+        with:
+          repository: tacle/tacle-bench
+          path: ${{ env.T_CREST_PATH }}${{ env.TACLE_PATH }}
+
+      - name: Checkout L2 cache
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+
+      - name: Run TACLe benchmarks
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: |
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/kernel/
+          cd ${{ env.TACLE_PATH }}bench/kernel/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh --skip pm/ --skip isqrt/
+
+  tacle-bench-sequential:
+    runs-on: ubuntu-latest
+    needs: [ build-tools ]
+
+    steps:
+      - name: Download tools
+        uses: actions/download-artifact@v4
+        with:
+          name: patmos-tools
+          path: ${{ env.ARTIFACTS_PATH }}
+
+      - name: Unpack tools
+        run: |
+          tar -xvf ${{ env.ARTIFACTS_PATH }}tools.tar
+          echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
+
+      - name: Checkout TACLe benchmark repository
+        uses: actions/checkout@v3
+        with:
+          repository: tacle/tacle-bench
+          path: ${{ env.T_CREST_PATH }}${{ env.TACLE_PATH }}
+
+      - name: Checkout L2 cache
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+
+      - name: Run TACLe benchmarks
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: |
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/sequential/
+          cd ${{ env.TACLE_PATH }}bench/sequential/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh --skip ammunition/ --skip rijndael_dec/ --skip rijndael_enc/
+
+  tacle-bench-test:
+    runs-on: ubuntu-latest
+    needs: [ build-tools ]
+
+    steps:
+      - name: Download tools
+        uses: actions/download-artifact@v4
+        with:
+          name: patmos-tools
+          path: ${{ env.ARTIFACTS_PATH }}
+
+      - name: Unpack tools
+        run: |
+          tar -xvf ${{ env.ARTIFACTS_PATH }}tools.tar
+          echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
+
+      - name: Checkout TACLe benchmark repository
+        uses: actions/checkout@v3
+        with:
+          repository: tacle/tacle-bench
+          path: ${{ env.T_CREST_PATH }}${{ env.TACLE_PATH }}
+
+      - name: Checkout L2 cache
+        uses: actions/checkout@v3
+        with:
+          path: ${{ env.T_CREST_PATH }}${{ env.L2_PATH }}
+
+      - name: Run TACLe benchmarks
+        working-directory: ${{ env.T_CREST_PATH }}
+        run: |
+          cp -v ${{ env.L2_PATH }}scripts/tacle_test.sh ${{ env.TACLE_PATH }}bench/test/
+          cd ${{ env.TACLE_PATH }}bench/test/
+          sudo chmod -v +x ./tacle_test.sh && ./tacle_test.sh
+
+  patmos-bench:
+    runs-on: ubuntu-latest
+    needs: [ build-tools ]
+
+    steps:
+      - name: Download tools
+        uses: actions/download-artifact@v4
+        with:
+          name: patmos-tools
+          path: ${{ env.ARTIFACTS_PATH }}
+
+      - name: Unpack tools
+        run: |
+          tar -xvf ${{ env.ARTIFACTS_PATH }}tools.tar
+          echo "$PWD/${{ env.T_CREST_PATH }}${{ env.TOOLS_PATH }}bin" >> $GITHUB_PATH
+
+      - name: Patmos benchmarks
+        run: |
+          cd ${{ env.T_CREST_PATH }}${{ env.BENCH_PATH }}build
+          ctest -j${{ env.PATMOS_BENCH_JOBS }}

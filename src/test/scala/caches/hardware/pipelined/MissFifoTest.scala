@@ -112,7 +112,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
   }
 
   def assertCmds(dut: MissFifo, expectedCmds: Array[Option[ExpectedCmd]], print: Boolean = false): Unit = {
-    println("Commands in MissFifo:")
+    if (print) { println("Commands in MissFifo:") }
     val cmdSignals = dut.io.pop.cmds
 
     for (i <- 0 until cmdSignals.length) {
@@ -130,14 +130,16 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
         cmdSignals(i).blockOffset.expect(0.U)
       }
 
-      println(s"Cmd $i: " +
-        s"reqId=${cmdSignals(i).reqId.peekInt()}, " +
-        s"coreId=${cmdSignals(i).coreId.peekInt()}, " +
-        s"blockOffset=${cmdSignals(i).blockOffset.peekInt()}."
-      )
+      if (print) {
+        println(s"Cmd $i: " +
+          s"reqId=${cmdSignals(i).reqId.peekInt()}, " +
+          s"coreId=${cmdSignals(i).coreId.peekInt()}, " +
+          s"blockOffset=${cmdSignals(i).blockOffset.peekInt()}."
+        )
+      }
     }
 
-    println("")
+    if (print) { println("") }
   }
 
   "MissFifo" should "push and pop entries correctly for non critical queue only" in {
@@ -206,7 +208,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.nonCritInfo.fullCmds(0).expect(true.B)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(1, 2, 0)), Some(ExpectedCmd(11, 3, 3)), Some(ExpectedCmd(13, 1, 0)), Some(ExpectedCmd(5, 2, 2))), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(1, 2, 0)), Some(ExpectedCmd(11, 3, 3)), Some(ExpectedCmd(13, 1, 0)), Some(ExpectedCmd(5, 2, 2))))
 
       assertMshrStatusCritQueue(
         dut,
@@ -248,7 +250,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.nonCritInfo.fullCmds(1).expect(false.B)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(2, 2, 0)), Some(ExpectedCmd(7, 2, 1)), None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(2, 2, 0)), Some(ExpectedCmd(7, 2, 1)), None, None))
 
       assertMshrStatusCritQueue(
         dut,
@@ -269,7 +271,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.nonCritInfo.fullCmds(2).expect(false.B)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(3, 1, 2)), None, None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(3, 1, 2)), None, None, None))
 
       assertMshrStatusCritQueue(
         dut,
@@ -290,7 +292,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
 
       dut.io.nonCritInfo.fullCmds(3).expect(false.B)
 
-      assertCmds(dut, Array(Option(ExpectedCmd(4, 3, 3)), None, None, None), print = true)
+      assertCmds(dut, Array(Option(ExpectedCmd(4, 3, 3)), None, None, None))
 
       assertMshrStatusCritQueue(
         dut,
@@ -415,7 +417,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       popEntry(dut, tag = 0x12, index = 0x2, byteEn = 0x3, repWay = 2, cmdCnt = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(1, 2, 0)), Some(ExpectedCmd(5, 3, 3)), None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(1, 2, 0)), Some(ExpectedCmd(5, 3, 3)), None, None))
 
       assertMshrStatusCritQueue(
         dut,
@@ -435,7 +437,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       popEntry(dut, tag = 0x44, index = 0x1, byteEn = 0x1, repWay = 3, cmdCnt = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(2, 2, 0)), Some(ExpectedCmd(6, 1, 0)), None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(2, 2, 0)), Some(ExpectedCmd(6, 1, 0)), None, None))
 
       assertMshrStatusCritQueue(
         dut,
@@ -494,7 +496,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       popEntry(dut, tag = 0xaa, index = 0xc, byteEn = 0x20, repWay = 2, cmdCnt = 2)
       assertFifoCapacity(dut, full = true, empty = false, crit = true)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(3, 1, 2)), Some(ExpectedCmd(7, 2, 2)), None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(3, 1, 2)), Some(ExpectedCmd(7, 2, 2)), None, None))
 
       assertMshrStatusCritQueue(
         dut,
@@ -514,7 +516,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       popEntry(dut, tag = 0x77, index = 0x4, byteEn = 0xc, repWay = 0, cmdCnt = 4)
       assertFifoCapacity(dut, full = false, empty = false, crit = true)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(9, 1, 1)), Some(ExpectedCmd(12, 3, 3)), Some(ExpectedCmd(13, 1, 0)), Some(ExpectedCmd(14, 2, 2))), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(9, 1, 1)), Some(ExpectedCmd(12, 3, 3)), Some(ExpectedCmd(13, 1, 0)), Some(ExpectedCmd(14, 2, 2))))
 
       assertMshrStatusCritQueue(
         dut,
@@ -534,7 +536,7 @@ class MissFifoTest extends AnyFlatSpec with ChiselScalatestTester {
       popEntry(dut, tag = 0xbb, index = 0xe, byteEn = 0xc0, repWay = 1, cmdCnt = 2)
       assertFifoCapacity(dut, full = false, empty = false)
 
-      assertCmds(dut, Array(Some(ExpectedCmd(4, 3, 3)), Some(ExpectedCmd(8, 2, 2)), None, None), print = true)
+      assertCmds(dut, Array(Some(ExpectedCmd(4, 3, 3)), Some(ExpectedCmd(8, 2, 2)), None, None))
 
       assertMshrStatusCritQueue(
         dut,

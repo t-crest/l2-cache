@@ -26,7 +26,8 @@ class SharedPipelinedCacheTestTop(
                                    l2RepPolicyGen: () => SharedCacheReplacementPolicyType,
                                    nMshrs: Option[Int] = None,
                                    nHalfMissCmds: Option[Int] = None,
-                                   dataFile: Option[String] = None
+                                   dataFile: Option[String] = None,
+                                   printCacheInfo: Boolean = true
                                  ) extends Module {
   require(isPow2(memBeatSize), "Bytes per burst need to be a power of 2.")
 
@@ -45,7 +46,8 @@ class SharedPipelinedCacheTestTop(
     memBurstLen = memBurstLen,
     l2RepPolicy = l2RepPolicyGen,
     nMshrs = nMshrs,
-    nHalfMissCmds = nHalfMissCmds
+    nHalfMissCmds = nHalfMissCmds,
+    printInfo = printCacheInfo
   ))
 
   val io = IO(new Bundle {

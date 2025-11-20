@@ -39,7 +39,8 @@ class SharedPipelinedCache(
                             memBurstLen: Int,
                             l2RepPolicy: () => SharedCacheReplacementPolicyType,
                             nMshrs: Option[Int] = None,
-                            nHalfMissCmds: Option[Int] = None
+                            nHalfMissCmds: Option[Int] = None,
+                            printInfo: Boolean = true
                           ) extends Module {
   require(isPow2(memBeatSize), "Number of bytes per beat must be a power of 2.")
   require(isPow2(bytesPerBlock), "Number of bytes per block must be a power of 2.")
@@ -78,21 +79,23 @@ class SharedPipelinedCache(
   val repDirtyInvalidStall = WireDefault(false.B)
   val writeMissHazard = WireDefault(false.B)
 
-  println(
-    s"L2 Cache Configuration: " +
-      s"Size = $sizeInBytes bytes, " +
-      s"Replacement policy = ${repPol.getClass.getSimpleName}, " +
-      s"Associativity = $nWays, " +
-      s"Block Size = $bytesPerBlock bytes, " +
-      s"Sub-block Size = $bytesPerSubBlock bytes, " +
-      s"Memory Beat Size = $memBeatSize bytes, " +
-      s"Memory Burst Length = $memBurstLen beats, " +
-      s"Miss Q depth = $mshrCnt, " +
-      s"Miss Q half miss cmds per entry = $halfMissCmdCnt cmds, " +
-      s"Number of Cores = $nCores" + "\n"
-  )
+  if (printInfo) {
+    println(
+      s"L2 Cache Configuration: " +
+        s"Size = $sizeInBytes bytes, " +
+        s"Replacement policy = ${repPol.getClass.getSimpleName}, " +
+        s"Associativity = $nWays, " +
+        s"Block Size = $bytesPerBlock bytes, " +
+        s"Sub-block Size = $bytesPerSubBlock bytes, " +
+        s"Memory Beat Size = $memBeatSize bytes, " +
+        s"Memory Burst Length = $memBurstLen beats, " +
+        s"Miss Q depth = $mshrCnt, " +
+        s"Miss Q half miss cmds per entry = $halfMissCmdCnt cmds, " +
+        s"Number of Cores = $nCores"
+    )
 
-  repPol.printConfig() // Print configuration of replacement policy
+    repPol.printConfig() // Print configuration of replacement policy
+  }
 
   val io = IO(new Bundle{
     val core = new CacheCorePortIO(addressWidth, bytesPerSubBlock * 8, reqIdWidth)

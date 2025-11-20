@@ -19,8 +19,7 @@ class SharedPipelinedCacheContWithAllEventsTest extends AnyFlatSpec with ChiselS
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1000,
-        printResults = PRINT_RESULTS
+        1000
       )
 
       dut.clock.step()

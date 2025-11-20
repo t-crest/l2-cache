@@ -20,8 +20,7 @@ class SharedPipelinedCacheWbTest extends AnyFlatSpec with ChiselScalatestTester 
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1500,
-        printResults = PRINT_RESULTS
+        1500
       )
 
       dut.clock.step()

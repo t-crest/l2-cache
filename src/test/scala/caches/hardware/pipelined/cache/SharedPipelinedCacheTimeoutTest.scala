@@ -21,8 +21,7 @@ class SharedPipelinedCacheTimeoutTest extends AnyFlatSpec with ChiselScalatestTe
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1500,
-        printResults = PRINT_RESULTS
+        1500
       )
 
       dut.clock.step()

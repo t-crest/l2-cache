@@ -18,8 +18,7 @@ class SharedPipelinedCacheBitPlruTest extends AnyFlatSpec with ChiselScalatestTe
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        700,
-        printResults = true
+        700
       )
 
       dut.clock.step()
@@ -40,8 +39,7 @@ class SharedPipelinedCacheBitPlruTest extends AnyFlatSpec with ChiselScalatestTe
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        150,
-        printResults = PRINT_RESULTS
+        150
       )
 
       dut.clock.step()
@@ -62,8 +60,7 @@ class SharedPipelinedCacheBitPlruTest extends AnyFlatSpec with ChiselScalatestTe
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1000,
-        printResults = PRINT_RESULTS
+        1000
       )
 
       dut.clock.step()

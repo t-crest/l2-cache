@@ -15,7 +15,7 @@ class BitPlruReplacementPolicy(nWays: Int, nSets: Int, nCores: Int, repSetFormat
   override def printConfig(): Unit = println(s"Bit PLRU replacement policy configuration: " +
     s"ways: $nWays, " +
     s"sets: $nSets, " +
-    s"cores: $nCores." + "\n")
+    s"cores: $nCores.")
 
   override def includeCriticalMissQ(): Boolean = false
 

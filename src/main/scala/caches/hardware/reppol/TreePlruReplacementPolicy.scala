@@ -15,7 +15,7 @@ class TreePlruReplacementPolicy(nWays: Int, nSets: Int, nCores: Int, repSetForma
   override def printConfig(): Unit = println(s"Tree PLRU replacement policy configuration: " +
     s"ways: $nWays, " +
     s"sets: $nSets, " +
-    s"cores: $nCores" + "\n")
+    s"cores: $nCores")
 
   override def includeCriticalMissQ(): Boolean = false
 

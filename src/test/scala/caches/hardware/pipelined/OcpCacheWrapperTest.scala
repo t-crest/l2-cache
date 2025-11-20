@@ -32,7 +32,8 @@ class OcpCacheWrapperTest extends AnyFlatSpec with ChiselScalatestTester {
       bytesPerSubBlock = 16,
       memBeatSize = memDataWidth / 8,
       memBurstLen = memBurstLen,
-      l2RepPolicy = l2ContPolGen
+      l2RepPolicy = l2ContPolGen,
+      printInfo = false
     )
 
     test(new OcpCacheWrapper(

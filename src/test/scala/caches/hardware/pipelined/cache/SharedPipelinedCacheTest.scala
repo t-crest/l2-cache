@@ -562,9 +562,9 @@ object CacheConfigs {
 }
 
 object SharedPipelinedCacheTest {
-  val PRINT_RESULTS = true
+  val PRINT_RESULTS = false
 
-  val PRINT_INFO = true
+  val PRINT_INFO = false
 
   def generateDut(cacheConfig: CacheConfiguration): Dut = {
     val nSets = cacheConfig.sizeInBytes / (cacheConfig.nWays * cacheConfig.bytesPerBlock)
@@ -594,7 +594,8 @@ object SharedPipelinedCacheTest {
       memBurstLen = cacheConfig.memBurstLen,
       l2RepPolicyGen = l2RepPolicy,
       dataFile = cacheConfig.memFile,
-      nHalfMissCmds = cacheConfig.nHalfMissCmds
+      nHalfMissCmds = cacheConfig.nHalfMissCmds,
+      printCacheInfo = PRINT_INFO
     )
 
     Dut(cacheGenFun, cacheConfig.nCores, tagWidth, indexWidth, blockOffsetWidth, byteOffsetWidth)
@@ -669,8 +670,7 @@ object SharedPipelinedCacheTest {
                                            indexWidth: Int,
                                            blockOffsetWidth: Int,
                                            byteOffsetWidth: Int,
-                                           maxCCs: Int,
-                                           printResults: Boolean = false
+                                           maxCCs: Int
                                          ): Unit = {
     val responses = mutable.Set[CacheResponse]()
     var previousRequestCore: Option[Int] = None
@@ -714,7 +714,15 @@ object SharedPipelinedCacheTest {
                   blockOffset << byteOffsetWidth |
                   byteOffset
 
-                println(s"Issued request at CC $currentCC: Core: $coreId, ReqId: $reqId, Addr: ${addr.toHexString}, RW: $rw, WData: ${wData.getOrElse("None")}, ByteEn: ${byteEn.getOrElse((math.pow(2, dut.subBlockDataWidth / 8).toInt - 1).toBinaryString)}")
+                if (PRINT_INFO) {
+                  println(s"Issued request at CC $currentCC: " +
+                    s"Core: $coreId, " +
+                    s"ReqId: $reqId, " +
+                    s"Addr: ${addr.toHexString}, " +
+                    s"RW: $rw, " +
+                    s"WData: ${wData.getOrElse("None")}, " +
+                    s"ByteEn: ${byteEn.getOrElse((math.pow(2, dut.subBlockDataWidth / 8).toInt - 1).toBinaryString)}")
+                }
 
                 performCacheRequest(dut, coreId = coreId, reqId = reqId, addr = addr, rw = rw, wData = wData, byteEn = byteEn)
                 previousRequestCore = Some(coreId)
@@ -724,13 +732,17 @@ object SharedPipelinedCacheTest {
                 previousRequestCore = None
               }
             case Stall(cycles) =>
-              println(s"Waiting for $cycles cycles at CC $currentCC, before issuing next request.")
+              if (PRINT_INFO) {
+                println(s"Waiting for $cycles cycles at CC $currentCC, before issuing next request.")
+              }
               previousRequestCore = None
               stallCycle = Some(currentCC + cycles)
               actionIdx += 1
             case PerformSchedulerOperation(addr, rw, wData) =>
               val wDataVal = wData.getOrElse(0)
-              println(s"Performing scheduler operation at CC $currentCC: ${if (rw) "RW" else "RD"}, for addr: $addr, with data: $wDataVal")
+              if (PRINT_INFO) {
+                println(s"Performing scheduler operation at CC $currentCC: ${if (rw) "RW" else "RD"}, for addr: $addr, with data: $wDataVal")
+              }
               performSchedulerOperation(dut, addr, rw, wDataVal)
               previousRequestCore = None
               actionIdx += 1
@@ -759,10 +771,12 @@ object SharedPipelinedCacheTest {
       currentCC += 1
     }
 
-    println(s"Test ran for: $currentCC CCs")
-    println(s"Expected number of responses: $expectedRespCnt")
+    if (PRINT_INFO) {
+      println(s"Test ran for: $currentCC CCs")
+      println(s"Expected number of responses: $expectedRespCnt")
+    }
 
-    if (printResults) {
+    if (PRINT_RESULTS) {
       println("")
       val sortedResponse = responses.toSeq.sortBy(req => req.receivedCC)
       println(s"Received ${sortedResponse.size} responses in total.")
@@ -795,7 +809,7 @@ object SharedPipelinedCacheTest {
       }
     }
 
-    if (printResults) {
+    if (PRINT_RESULTS) {
       println("")
     }
   }

@@ -240,7 +240,7 @@ class ContentionReplacementPolicy(
     s"cores: $nCores, " +
     s"mim events: $enableMissInMiss, " +
     s"precedent events: $enablePrecedentEvents, " +
-    s"wb events: $enableWbEvents." + "\n")
+    s"wb events: $enableWbEvents.")
 
   override def includeCriticalMissQ(): Boolean = enableMissInMiss
 
