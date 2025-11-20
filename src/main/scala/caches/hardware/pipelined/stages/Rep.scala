@@ -19,6 +19,9 @@ class MshrInfoCheck(tagWidth: Int, nWays: Int, nSets: Int, nMshrs: Int) extends 
     val critQTags = Input(Vec(nMshrs, UInt(tagWidth.W)))
     val nonCritQValid = Input(Vec(nMshrs, Bool()))
     val critQValid = Input(Vec(nMshrs, Bool()))
+    val nonCritQCritCores = Input(Vec(nMshrs, Bool()))
+    val wbQValid = Input(Vec(nMshrs, Bool()))
+    val wbQCritCores = Input(Vec(nMshrs, Bool()))
     val nonCritQRepWays = Input(Vec(nMshrs, UInt(log2Up(nWays).W)))
     val critQRepWays = Input(Vec(nMshrs, UInt(log2Up(nWays).W)))
     val nonCritHalfMissFull = Input(Vec(nMshrs, Bool()))
@@ -29,17 +32,22 @@ class MshrInfoCheck(tagWidth: Int, nWays: Int, nSets: Int, nMshrs: Int) extends 
     val halfMissRepWay = Output(UInt(log2Up(nWays).W))
     val reservedRepWay = Output(Bool())
     val halfMissCapacity = Output(Bool())
+    val nonCritMisses = Output(UInt(log2Up(nMshrs).W))
+    val nonCritWbs = Output(UInt(log2Up(nMshrs).W))
   })
 
   val nonCritMissMatches = Wire(Vec(nMshrs, Bool()))
   val critMissMatches = Wire(Vec(nMshrs, Bool()))
+  val nonCritMisses = Wire(Vec(nMshrs, Bool()))
+  val nonCritWbs = Wire(Vec(nMshrs, Bool()))
   val repWayMatches = Wire(Vec(nMshrs, Bool()))
 
   for (mshr <- 0 until nMshrs) {
-    // TODO: Combine this with the core limit update logic that checks if there are any non-critical misses or writebacks,
-    //  and then pass it to the contention policy instead
     val nonCritQIdxMatch = io.nonCritQIdxs(mshr) === io.idx
     val nonCritQValid = io.nonCritQValid(mshr)
+
+    nonCritMisses(mshr) := nonCritQValid && io.nonCritQCritCores(mshr)
+    nonCritWbs(mshr) := io.wbQValid(mshr) && io.wbQCritCores(mshr)
     repWayMatches(mshr) := nonCritQIdxMatch && io.nonCritQRepWays(mshr) === io.repWay && nonCritQValid
     nonCritMissMatches(mshr) := nonCritQIdxMatch && io.nonCritQTags(mshr) === io.tag && nonCritQValid
     critMissMatches(mshr) := io.critQIdxs(mshr) === io.idx && io.critQTags(mshr) === io.tag && io.critQValid(mshr)
@@ -63,6 +71,8 @@ class MshrInfoCheck(tagWidth: Int, nWays: Int, nSets: Int, nMshrs: Int) extends 
   io.halfMissRepWay := Mux(anyCritMisses, io.critQRepWays(halfMissIdx), io.nonCritQRepWays(halfMissIdx))
   io.reservedRepWay := reservedRepWay
   io.halfMissCapacity := io.reqValid && (cmdCapacityCrit || cmdCapacityNonCrit)
+  io.nonCritMisses := PopCount(nonCritMisses)
+  io.nonCritWbs := PopCount(nonCritWbs)
 }
 
 case class IsHitResult(hit: Bool, hitIdx: UInt)
@@ -256,6 +266,9 @@ class Rep(nCores: Int, nSets: Int, nWays: Int, nMshrs: Int, reqIdWidth: Int, tag
   mshrCheckLogic.io.critQRepWays := io.missCritInfo.replacementWays
   mshrCheckLogic.io.nonCritHalfMissFull := io.missNonCritInfo.fullCmds
   mshrCheckLogic.io.critHalfMissFull := io.missCritInfo.fullCmds
+  mshrCheckLogic.io.nonCritQCritCores := io.missNonCritInfo.critMshrs
+  mshrCheckLogic.io.wbQValid := io.wbInfo.wbQueueValidReqs
+  mshrCheckLogic.io.wbQCritCores := io.wbInfo.wbQueueCritReqs
 
   val tagDirtyUpdate3 = updateTagsAndDirtyBits(dirtyBitsReg2, setTagsReg2, indexReg2)
   val isRepLineDirty = tagDirtyUpdate3.dirty(repWay)
@@ -272,10 +285,8 @@ class Rep(nCores: Int, nSets: Int, nWays: Int, nMshrs: Int, reqIdWidth: Int, tag
   io.repPolCtrl.update := update && !io.stall
   io.repPolCtrl.evict := evict && !io.stall
 
-  io.repPolInfo.missQueueValidReqs := io.missNonCritInfo.validMshrs
-  io.repPolInfo.missQueueCritReqs := io.missNonCritInfo.critMshrs
-  io.repPolInfo.wbQueueCritReqs := io.wbInfo.wbQueueCritReqs
-  io.repPolInfo.wbQueueValidReqs := io.wbInfo.wbQueueValidReqs
+  io.repPolInfo.nonCritMisses := mshrCheckLogic.io.nonCritMisses
+  io.repPolInfo.nonCritWbs := mshrCheckLogic.io.nonCritWbs
 
   // --------------- Miss fifo connections ---------------
   io.isMissPushCrit := mshrCheckLogic.io.halfMissCrit || (evict && io.repPolInfo.updateCoreReachedLimit)

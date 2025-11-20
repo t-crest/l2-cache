@@ -9,8 +9,6 @@ class SharedPipelinedCacheTimeoutTest extends AnyFlatSpec with ChiselScalatestTe
     val cache = generateDut(CacheConfigs.config64TimeOut)
 
     test(cache.dutGen.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation)) { dut =>
-      cancel("timeout policy not fixed yet.")
-
       defaultAssignments(dut, cache.nCores)
 
       // Issue the first set of requests

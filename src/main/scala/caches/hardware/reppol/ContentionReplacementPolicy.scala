@@ -120,10 +120,8 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
     val lineAssignments = Input(Vec(nWays, UInt(log2Up(nCores).W)))
     val validLineAssignments = Input(Vec(nWays, Bool()))
     val coreLimits = Input(Vec(nCores, UInt(CONTENTION_LIMIT_WIDTH.W)))
-    val missQueueValidCores = Input(Vec(nMshrs, Bool()))
-    val missQueueCritCores = Input(Vec(nMshrs, Bool()))
-    val wbQueueValidCores = Input(Vec(nMshrs, Bool()))
-    val wbQueueCritCores = Input(Vec(nMshrs, Bool()))
+    val nonCritMisses = Input(UInt(log2Up(nMshrs).W))
+    val nonCritWbs = Input(UInt(log2Up(nMshrs).W))
     val updtCore1 = Output(UInt(log2Up(nCores).W))
     val updtCore1Val = Output(UInt(CONTENTION_LIMIT_WIDTH.W))
     val updtCore2 = Output(UInt(log2Up(nCores).W))
@@ -134,9 +132,6 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   val updtCore2En = WireDefault(false.B)
   val isReqCoreCritical = io.criticalCores(io.reqCore)
   val doesReqCoreOwnFirstUcWay = io.firstUcSetWayCore === io.reqCore
-
-  val nonCritMisses = VecInit(Seq.tabulate(nMshrs)((i: Int) => io.missQueueValidCores(i) && !io.missQueueCritCores(i)))
-  val nonCritWbs = VecInit(Seq.tabulate(nMshrs)((i: Int) => io.wbQueueValidCores(i) && !io.wbQueueCritCores(i)))
 
   // Decrement the contention limit when we encounter an eviction or replacement event
   val evictVal1 = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
@@ -178,10 +173,10 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   val mimVal = WireDefault(0.U((log2Up(nMshrs) + 1).W))
   if (enaMim) {
     // We check if there are any non-critical misses ahead and if the requesting core is critical
-    val missInMissEvent = isReqCoreCritical && nonCritMisses.reduce((x, y) => x || y)
+    val missInMissEvent = isReqCoreCritical && io.nonCritMisses =/= 0.U
 
     when(missInMissEvent) {
-      mimVal := PopCount(nonCritMisses)
+      mimVal := io.nonCritMisses
     }
   }
 
@@ -189,10 +184,10 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   val wbVal = WireDefault(0.U((log2Up(nMshrs) + 1).W))
   if (enaWb) {
     // We check if there are any non-critical WBs and if the requesting core is critical
-    val wbEvent = isReqCoreCritical && nonCritWbs.reduce((x, y) => x || y)
+    val wbEvent = isReqCoreCritical && io.nonCritWbs =/= 0.U
 
     when(wbEvent) {
-      wbVal := PopCount(nonCritWbs)
+      wbVal := io.nonCritWbs
     }
   }
 
@@ -340,10 +335,8 @@ class ContentionReplacementPolicy(
   coreLimitUpdtCtrl.io.lineAssignments := lineAssignPipeReg
   coreLimitUpdtCtrl.io.validLineAssignments := lineValidAssignPipeReg
   coreLimitUpdtCtrl.io.coreLimits := coresLimitsPipeReg
-  coreLimitUpdtCtrl.io.missQueueValidCores := io.info.missQueueValidReqs
-  coreLimitUpdtCtrl.io.missQueueCritCores := io.info.missQueueCritReqs
-  coreLimitUpdtCtrl.io.wbQueueValidCores := io.info.wbQueueValidReqs
-  coreLimitUpdtCtrl.io.wbQueueCritCores := io.info.wbQueueCritReqs
+  coreLimitUpdtCtrl.io.nonCritMisses := io.info.nonCritMisses
+  coreLimitUpdtCtrl.io.nonCritWbs := io.info.nonCritWbs
 
   // Base policy forwarding signals
   wbStageSetIdx := setIdxPipeReg2

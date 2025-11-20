@@ -33,10 +33,8 @@ class SchedulerControlIO(nCores: Int, dataWidth: Int) extends Bundle {
 class ReplacementPolicyInfoIO(nWays: Int, missQueueDepth: Int) extends Bundle {
   val isHit = Input(Bool())
   val hitWay = Input(UInt(log2Up(nWays).W))
-  val missQueueValidReqs = Input(Vec(missQueueDepth, Bool()))
-  val missQueueCritReqs = Input(Vec(missQueueDepth, Bool()))
-  val wbQueueValidReqs = Input(Vec(missQueueDepth, Bool()))
-  val wbQueueCritReqs = Input(Vec(missQueueDepth, Bool()))
+  val nonCritMisses = Input(UInt(log2Up(missQueueDepth).W))
+  val nonCritWbs = Input(UInt(log2Up(missQueueDepth).W))
   val isReplacementWayCrit = Output(Bool())
   val isReplacementWayAtLimit = Output(Bool())
   val updateCoreReachedLimit = Output(Bool())

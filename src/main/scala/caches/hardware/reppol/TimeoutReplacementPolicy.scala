@@ -5,6 +5,54 @@ import caches.hardware.util.{PipelineReg, TwoReadMemBlock}
 import chisel3._
 import chisel3.util._
 
+class TimerUpdateCtrl(nWays: Int, nSets: Int) extends Module {
+  val io = IO (new Bundle {
+    val bubble = Input(Bool())
+    val refresh = Input(Bool())
+    val reqCoreSetIdx = Input(UInt(log2Up(nSets).W))
+    val oldDecIdx = Input(UInt(log2Up(nSets).W))
+    val decTimers = Input(Vec(nWays, UInt(TIMEOUT_LIMIT_WIDTH.W)))
+    val refreshTimers = Input(Vec(nWays, UInt(TIMEOUT_LIMIT_WIDTH.W)))
+    val wTimers = Output(Vec(nWays, UInt(TIMEOUT_LIMIT_WIDTH.W)))
+    val rIdx = Output(UInt(log2Up(nSets).W))
+    val wIdx = Output(UInt(log2Up(nSets).W))
+    val wEn = Output(Bool())
+  })
+
+  val wTimers = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
+  val wIdx = WireDefault(0.U(log2Up(nSets).W))
+  val rIdx = WireDefault(0.U(log2Up(nSets).W))
+  val wEn = WireDefault(false.B)
+
+  val decIdx = RegInit(0.U(log2Up(nSets).W))
+
+  when(io.refresh) {
+    wTimers := io.refreshTimers
+    wIdx := io.reqCoreSetIdx
+
+    when(io.oldDecIdx === io.reqCoreSetIdx) {
+      decIdx := decIdx + 1.U
+      rIdx := decIdx
+    }.otherwise {
+      rIdx := io.oldDecIdx
+    }
+  } .otherwise {
+    wTimers := io.decTimers
+    decIdx := decIdx + 1.U
+    wIdx := io.oldDecIdx
+    rIdx := decIdx
+  }
+
+  when(!io.bubble) {
+    wEn := true.B
+  }
+
+  io.rIdx := rIdx
+  io.wIdx := wIdx
+  io.wEn := wEn
+  io.wTimers := wTimers
+}
+
 class CoreTimeoutTable(nCores: Int) extends Module {
   val io = IO(new Bundle {
     val scheduler = new SchedulerControlIO(nCores, TIMEOUT_LIMIT_WIDTH)
@@ -81,79 +129,110 @@ class TimeoutReplacementPolicy(
     s"cores: $nCores"
   )
 
-  override def includeCriticalMissQ(): Boolean = true
+  override def includeCriticalMissQ(): Boolean = false
 
   override def includeCriticalWbQ(): Boolean = false
 
-//  //--------------- Read Stage ---------------------
-//  val basePolRead = Module(basePolicyType.buildBasePolicyRead(nWays, nSets, repSetFormat))
-//  val timerMemory = Module(new TimerMemory(nWays, nSets))
-//
-//  // Need to delay this signal by two CCs because PLRU has 2 stages
-//  val idxDelayReg = PipelineReg(io.control.setIdx, 0.U, !io.control.stall)
-//  val wbStageSetIdx = WireDefault(0.U(log2Up(nSets).W))
-//  val wbStageMruBits = WireDefault(0.U(basePolRead.stateWidth.W))
-//  val decrementIdx = WireDefault(0.U(log2Up(nSets).W))
-//  val timerMemWrEn = WireDefault(false.B)
-//  val timerMemWrData = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
-//  val timerMemWrIdx = WireDefault(0.U(log2Up(nSets).W))
-//
-//  basePolRead.io.stall := io.control.stall
-//  basePolRead.io.rIdx := io.control.setIdx
-//  basePolRead.io.wrEn := io.control.update.valid
-//  basePolRead.io.wIdx := wbStageSetIdx
-//  basePolRead.io.wData := wbStageMruBits
-//  basePolRead.io.fwd := wbStageSetIdx === idxDelayReg && io.control.update.valid
-//
-//  timerMemory.io.stall := io.control.stall
-//  timerMemory.io.rIdx1 := decrementIdx
-//  timerMemory.io.rIdx2 := idxDelayReg
-//  timerMemory.io.wrEn := timerMemWrEn
-//  timerMemory.io.wIdx := timerMemWrIdx
-//  timerMemory.io.wData := timerMemWrData
-//
-//  val replaceSetPipeReg = PipelineReg(basePolRead.io.replacementSet, getDefaultRepSet, !io.control.stall)
-//  val mruBitsPipeReg = PipelineReg(basePolRead.io.readState, 0.U, !io.control.stall)
-//  val setIdxPipeReg = PipelineReg(idxDelayReg, 0.U, !io.control.stall)
-//
-//  // ---------------- Update stage ----------------
-//  val coreTimeoutTable = Module(new CoreTimeoutTable(nCores))
-//  val timeoutFilter = Module(new TimeoutFilter(nWays, nSets, nCores, repSetFormat))
-//  val basePolUpdate = Module(basePolicyType.buildBasePolicyUpdate(nWays, repSetFormat))
-//
-//  coreTimeoutTable.io.scheduler <> io.scheduler
-//
-//  timeoutFilter.io.setIdx := setIdxPipeReg
-//  timeoutFilter.io.update := io.control.update
-////  timeoutFilter.io.updateCoreId := io.info.updateCoreId
-//  timeoutFilter.io.baseCandidates := replaceSetPipeReg
-//  timeoutFilter.io.coreTimeouts := coreTimeoutTable.io.rCoreTimeouts
-//  timeoutFilter.io.decIdxTimers := timerMemory.io.rTimers1
-//  timeoutFilter.io.updateIdxTimers := timerMemory.io.rTimers2
-//
-//  // Update base policy
-//  basePolUpdate.io.hitWay := io.control.update.bits
-//  basePolUpdate.io.stateIn := mruBitsPipeReg
-//
-//  // Base policy forwarding signals
-//  wbStageSetIdx := setIdxPipeReg
-//  wbStageMruBits := basePolUpdate.io.stateOut
-//
-//  // Timer memory write signals
-//  decrementIdx := timeoutFilter.io.decIdx
-//  timerMemWrEn := true.B // TODO: Should write enable always be high since we are always decrementing something ???
-//  timerMemWrData := timeoutFilter.io.wTimers
-//  timerMemWrIdx := timeoutFilter.io.wIdx
-//
-//  // Default output assignments
-//  io.control <> 0.U.asTypeOf(io.control)
-//  io.info <> 0.U.asTypeOf(io.info)
-//
-//  io.control.replaceWay := timeoutFilter.io.replaceWay
-//  io.control.isValid := timeoutFilter.io.isRepValid
+  // ---------------- Read Stage ----------------
+  val basePolRead = Module(basePolicyType.buildBasePolicyRead(nWays, nSets, repSetFormat))
+  val timerMemory = Module(new TimerMemory(nWays, nSets))
 
-    // Default output assignments
-    io.control <> 0.U.asTypeOf(io.control)
-    io.info <> 0.U.asTypeOf(io.info)
-    io.scheduler <> 0.U.asTypeOf(io.scheduler)
+  val wbStageSetIdx = WireDefault(0.U(log2Up(nSets).W))
+  val wbStageMruBits = WireDefault(0.U(basePolRead.stateWidth.W))
+  val wbStageRepWay = WireDefault(0.U(log2Up(nWays).W))
+  val wbStageUpdateCore = WireDefault(0.U(log2Up(nCores).W))
+  val wbStageDecIdx = WireDefault(0.U(log2Up(nSets).W))
+  val wbStageTimerMemWrEn = WireDefault(false.B)
+  val wbStageTimerMemWrData = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
+  val wbStageTimerMemWrIdx = WireDefault(0.U(log2Up(nSets).W))
+  val wbStageInsertBubble = WireDefault(false.B)
+
+  // Need to delay this signal by two CCs because PLRU has 2 stages
+  val idxDelayReg = PipelineReg(io.control.setIdx, 0.U, !io.control.stall && !wbStageInsertBubble)
+  val fwdMruBits = wbStageSetIdx === idxDelayReg && io.control.update
+
+  basePolRead.io.stall := io.control.stall || wbStageInsertBubble
+  basePolRead.io.rIdx := io.control.setIdx
+  basePolRead.io.wrEn := io.control.update
+  basePolRead.io.wIdx := wbStageSetIdx
+  basePolRead.io.wData := wbStageMruBits
+  basePolRead.io.fwd := fwdMruBits
+
+  timerMemory.io.stall := io.control.stall || wbStageInsertBubble
+  timerMemory.io.rIdx1 := wbStageDecIdx
+  timerMemory.io.rIdx2 := idxDelayReg
+  timerMemory.io.wrEn := wbStageTimerMemWrEn
+  timerMemory.io.wIdx := wbStageTimerMemWrIdx
+  timerMemory.io.wData := wbStageTimerMemWrData
+
+  val replaceSetPipeReg = PipelineReg(basePolRead.io.replacementSet, getDefaultRepSet, !io.control.stall)
+  val decIdxPipeReg1 = PipelineReg(wbStageDecIdx, 0.U, !io.control.stall)
+  val reqValidPipeReg1 = PipelineReg(io.control.valid, false.B, !io.control.stall && !wbStageInsertBubble)
+  val coreIdPipeReg1 = PipelineReg(io.control.coreId, 0.U, !io.control.stall && !wbStageInsertBubble)
+  val mruBitsPipeReg1 = PipelineReg(basePolRead.io.readState, 0.U, !io.control.stall && !wbStageInsertBubble)
+  val setIdxPipeReg1 = PipelineReg(idxDelayReg, 0.U, !io.control.stall && !wbStageInsertBubble)
+
+  // ---------------- Update stage ----------------
+  val coreTimeoutTable = Module(new CoreTimeoutTable(nCores))
+  val coreTimerUpdtCtrl = Module(new TimerUpdateCtrl(nWays, nSets))
+  val timeoutFilter = Module(new TimeoutFilter(nWays, nSets, nCores, repSetFormat))
+  val basePolUpdate = Module(basePolicyType.buildBasePolicyUpdate(nWays))
+
+  timeoutFilter.io.setIdx := setIdxPipeReg1
+  timeoutFilter.io.decIdx := decIdxPipeReg1
+  timeoutFilter.io.isHit := io.info.isHit
+  timeoutFilter.io.hitWayIdx := io.info.hitWay
+  timeoutFilter.io.reqCoreId := coreIdPipeReg1
+  timeoutFilter.io.baseCandidates := replaceSetPipeReg
+  timeoutFilter.io.coreTimeouts := coreTimeoutTable.io.rCoreTimeouts
+  timeoutFilter.io.decIdxTimers := timerMemory.io.rTimers1
+  timeoutFilter.io.setIdxTimers := timerMemory.io.rTimers2
+
+  coreTimeoutTable.io.scheduler <> io.scheduler
+
+  // Update base policy
+  basePolUpdate.io.hit := io.info.isHit
+  basePolUpdate.io.hitWay := io.info.hitWay
+  basePolUpdate.io.repWay := timeoutFilter.io.replacementWay.bits
+  basePolUpdate.io.stateIn := mruBitsPipeReg1
+
+  val isBubblePipeReg = PipelineReg(false.B, true.B, !io.control.stall, wbStageInsertBubble)
+  val wDecTimerPipeReg = PipelineReg(timeoutFilter.io.wDecTimers, VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W))), !io.control.stall, wbStageInsertBubble)
+  val wRefreshTimerPipeReg = PipelineReg(timeoutFilter.io.wRefreshTimers, VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W))), !io.control.stall, wbStageInsertBubble)
+  val repWayPipeReg = PipelineReg(timeoutFilter.io.replacementWay.bits, 0.U, !io.control.stall, wbStageInsertBubble)
+  val repWayValidPipeReg = PipelineReg(timeoutFilter.io.replacementWay.valid, 0.U, !io.control.stall, wbStageInsertBubble)
+  val isReqHitPipeReg = PipelineReg(io.info.isHit, 0.U, !io.control.stall, wbStageInsertBubble)
+  val hitWayPipeReg = PipelineReg(io.info.hitWay, 0.U, !io.control.stall, wbStageInsertBubble)
+  val decIdxPipeReg2 = PipelineReg(decIdxPipeReg1, 0.U, !io.control.stall, wbStageInsertBubble)
+  val reqValidPipeReg2 = PipelineReg(reqValidPipeReg1, false.B, !io.control.stall, wbStageInsertBubble)
+  val coreIdPipeReg2 = PipelineReg(coreIdPipeReg1, 0.U, !io.control.stall, wbStageInsertBubble)
+  val mruBitsPipeReg2 = PipelineReg(basePolUpdate.io.stateOut, 0.U, !io.control.stall, wbStageInsertBubble)
+  val setIdxPipeReg2 = PipelineReg(setIdxPipeReg1, 0.U, !io.control.stall, wbStageInsertBubble)
+
+  // ---------------- WB stage ----------------
+  coreTimerUpdtCtrl.io.bubble := isBubblePipeReg
+  coreTimerUpdtCtrl.io.refresh := io.control.update
+  coreTimerUpdtCtrl.io.reqCoreSetIdx := setIdxPipeReg2
+  coreTimerUpdtCtrl.io.oldDecIdx := decIdxPipeReg2
+  coreTimerUpdtCtrl.io.decTimers := wDecTimerPipeReg
+  coreTimerUpdtCtrl.io.refreshTimers := wRefreshTimerPipeReg
+
+  // Base policy forwarding signals
+  wbStageSetIdx := setIdxPipeReg2
+  wbStageRepWay := repWayPipeReg
+  wbStageMruBits := mruBitsPipeReg2
+  wbStageUpdateCore := coreIdPipeReg2
+  wbStageDecIdx := coreTimerUpdtCtrl.io.rIdx
+  wbStageTimerMemWrEn := coreTimerUpdtCtrl.io.wEn
+  wbStageTimerMemWrData := coreTimerUpdtCtrl.io.wTimers
+  wbStageTimerMemWrIdx := coreTimerUpdtCtrl.io.wIdx
+  wbStageInsertBubble := reqValidPipeReg2 && ((((wbStageSetIdx === setIdxPipeReg1) || (wbStageSetIdx === decIdxPipeReg1)) && io.control.update) || io.control.evict)
+
+  // Default output assignments
+  io.control <> 0.U.asTypeOf(io.control)
+  io.info <> 0.U.asTypeOf(io.info)
+
+  io.control.replaceWay := repWayPipeReg
+  io.control.isValid := repWayValidPipeReg
+  io.control.insertBubble := wbStageInsertBubble
 }

@@ -51,10 +51,12 @@ object ReplacementPolicyTest {
 
     dut.io.policy.control.setIdx.poke(0.U)
     dut.io.policy.control.coreId.poke(coreId.U)
+    dut.io.policy.control.valid.poke(true.B)
 
     dut.clock.step()
 
     dut.io.policy.control.coreId.poke(0.U)
+    dut.io.policy.control.valid.poke(false.B)
 
     dut.clock.step()
 
@@ -79,10 +81,12 @@ object ReplacementPolicyTest {
 
     dut.io.policy.control.setIdx.poke(0.U)
     dut.io.policy.control.coreId.poke(coreId.U)
+    dut.io.policy.control.valid.poke(true.B)
 
     dut.clock.step()
 
     dut.io.policy.control.coreId.poke(0.U)
+    dut.io.policy.control.valid.poke(false.B)
     dut.io.policy.info.isHit.poke(true.B)
     dut.io.policy.info.hitWay.poke(hitWay.U)
 

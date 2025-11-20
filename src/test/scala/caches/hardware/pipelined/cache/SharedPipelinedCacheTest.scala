@@ -354,7 +354,7 @@ object Tests {
     ExpectFinishedRejectedResponse(coreId = 0, reqId = 20, expectedData = "62835ec7c17a39e585c08d4880f921f9"),
     ExpectFinishedRejectedResponse(coreId = 2, reqId = 16, expectedData = "be3f4422beec45cbedee67559c392dcd"),
     ExpectFinishedRejectedResponse(coreId = 0, reqId = 17, expectedData = "54e147d27169a16cc978d79543c85c9c"),
-    Stall(500), // Wait until the lines had timed out
+    Stall(600), // Wait until the lines had timed out
     CacheRequest(coreId = 0, reqId = 21, tag = 10, index = 23, blockOffset = 2, rw = false, expectedData = Some("f9bfe1b8c3c9caad333403b8dbbd4e8c")), // Bring new line into the cache (put in way: 4, idx: 23)
     CacheRequest(coreId = 2, reqId = 22, tag = 11, index = 23, blockOffset = 2, rw = false, expectedData = Some("29426de6f805eb9864e32306480eeea4")), // Bring new line into the cache (put in way: 0, idx: 23)
     CacheRequest(coreId = 2, reqId = 23, tag = 12, index = 23, blockOffset = 2, rw = false, expectedData = Some("db5f5acbd0845670a0fab4f7534923e3")), // Bring new line into the cache (put in way: 0, idx: 23)
