@@ -7,8 +7,8 @@ import chisel3.util._
 /**
  * Binary tree based implementation of Pseudo LRU
  *
- * @param nWays number of ways in a single cache set
- * @param nSets number of sets in the whole cache
+ * @param nWays  number of ways in a single cache set
+ * @param nSets  number of sets in the whole cache
  * @param nCores number of cores sharing the cache
  */
 class TreePlruReplacementPolicy(nWays: Int, nSets: Int, nCores: Int, repSetFormat: BaseReplacementSetFormat = new NumericalFormat) extends SharedCacheReplacementPolicyType(nWays, nSets, nCores, repSetFormat = repSetFormat) {

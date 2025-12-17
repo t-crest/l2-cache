@@ -1,8 +1,8 @@
 package caches.hardware.pipelined
 
+import caches.hardware.pipelined.stages.MemInterfaceToUpdateIO
 import chisel3._
 import chisel3.util._
-import caches.hardware.pipelined.stages.MemInterfaceToUpdateIO
 
 /**
  * @param beatSize Beat size in bytes
@@ -32,17 +32,18 @@ class CacheMemoryControllerIO(addrWidth: Int, beatSize: Int) extends Bundle {
 }
 
 /**
+ * Logic block responsible for interfacing between the cache and the higher level memory block.
  *
- * @param nCores Number of cores connected to the cache
- * @param nWays Number of ways in the cache
- * @param reqIdWidth Request ID width
- * @param tagWidth Tag width
- * @param indexWidth Index width
+ * @param nCores           Number of cores connected to the cache
+ * @param nWays            Number of ways in the cache
+ * @param reqIdWidth       Request ID width
+ * @param tagWidth         Tag width
+ * @param indexWidth       Index width
  * @param blockOffsetWidth Block offset width
- * @param blockWidth Width of a single cache line
- * @param subBlockWidth Width of a cache line sub-block
- * @param beatSize Size of a single beat in bytes
- * @param burstLen Number of beats in a single transfer
+ * @param blockWidth       Width of a single cache line
+ * @param subBlockWidth    Width of a cache line sub-block
+ * @param beatSize         Size of a single beat in bytes
+ * @param burstLen         Number of beats in a single transfer
  */
 class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffsetWidth: Int, blockWidth: Int, subBlockWidth: Int, beatSize: Int, burstLen: Int) extends Module {
   require((blockWidth / 8) >= (beatSize * burstLen), "Block size must be greater or equal to the total size of a single memory command.")
@@ -72,7 +73,7 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
   val memRDataReg = RegInit(VecInit(Seq.fill(blockWidth / (beatSize * 8))(0.U((beatSize * 8).W))))
   val totalBurstCount = RegInit(0.U(log2Up(blockWidth / (beatSize * 8)).W))
   val cmdBurstCount = RegInit(0.U(log2Up(beatSize).W))
-  val cmdCounter = RegInit(0.U((log2Up(nCommands)+1).W)) // RAM command counter
+  val cmdCounter = RegInit(0.U((log2Up(nCommands) + 1).W)) // RAM command counter
   val halfMissCmdCounter = RegInit(0.U((log2Up(nHalfMissCmds) + 1).W)) // Half of the miss command counter
   val popQSelReg = RegInit(0.U(1.W)) // 0 - non-crit, 1 - crit
 
@@ -121,7 +122,7 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
       when(cmdCounter === nCommands.U) {
         cmdCounter := 0.U
         stateReg := sDoneRead
-      } .otherwise {
+      }.otherwise {
         memRAddrValid := true.B
         reqTag := io.missFifo.popEntry.tag
         reqIdx := io.missFifo.popEntry.index
@@ -136,7 +137,7 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
       when(cmdCounter === nCommands.U) {
         cmdCounter := 0.U
         stateReg := sDoneWrite
-      } .otherwise {
+      }.otherwise {
         memWAddrValid := true.B
         reqTag := io.wbFifo.popEntry.tag
         reqIdx := io.wbFifo.popEntry.index
@@ -189,7 +190,7 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
         stateReg := sIdle
         totalBurstCount := 0.U
         readingPopEntry := true.B
-      } .otherwise {
+      }.otherwise {
         updateLogicValidCmd := true.B
         halfMissCmdCounter := halfMissCmdCounter + 1.U
       }

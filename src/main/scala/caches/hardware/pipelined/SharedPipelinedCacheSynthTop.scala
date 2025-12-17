@@ -69,9 +69,9 @@ object SharedPipelinedCacheSynthTop extends App {
   val memBurstLen = 4
 
   val l2nSets = l2Size / (nWays * bytesPerBlock)
-//  val l2RepPolicy = () => new BitPlruReplacementPolicy(nWays, l2nSets, nCores)
-//  val l2RepPolicy = () => new TreePlruReplacementPolicy(nWays, l2nSets, nCores)
-//  val l2RepPolicy = () => new TimeoutReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, repSetFormat = new MruFormat)
+  //  val l2RepPolicy = () => new BitPlruReplacementPolicy(nWays, l2nSets, nCores)
+  //  val l2RepPolicy = () => new TreePlruReplacementPolicy(nWays, l2nSets, nCores)
+  //  val l2RepPolicy = () => new TimeoutReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, repSetFormat = new MruFormat)
   val l2RepPolicy = () => new ContentionReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, true, true, true, repSetFormat = new MruFormat)
 
   println("Generating the L2 cache hardware for synthesis...")

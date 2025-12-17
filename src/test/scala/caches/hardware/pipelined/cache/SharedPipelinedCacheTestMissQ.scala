@@ -1,8 +1,9 @@
 package caches.hardware.pipelined.cache
 
-import caches.hardware.pipelined.cache.SharedPipelinedCacheTest._
+import SharedPipelinedCacheTest._
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
+
 
 class SharedPipelinedCacheTestMissQ extends AnyFlatSpec with ChiselScalatestTester {
   "SharedPipelinedCache" should "work with miss-q and precedent events for 8 ways and 128 sets" in {

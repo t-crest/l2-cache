@@ -33,7 +33,7 @@ class TimeoutFilter(nWays: Int, nSets: Int, nCores: Int, repSetFormat: BaseRepla
 
     when(anyTimeoutInFirstSet.asUInt.orR) {
       baseCandMask := anyTimeoutInFirstSet
-    } .otherwise {
+    }.otherwise {
       baseCandMask := anyTimeoutInSecondSet
     }
 
@@ -91,7 +91,7 @@ class TimeoutFilter(nWays: Int, nSets: Int, nCores: Int, repSetFormat: BaseRepla
     }
   }
 
-  when (io.decIdx === io.setIdx) { // When the refresh set and dec set are the same
+  when(io.decIdx === io.setIdx) { // When the refresh set and dec set are the same
     val newRefreshTimers = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
     for (way <- 0 until nWays) {
       when(way.U === refreshWayIdx && (refreshVal > wDecTimers(way))) {
@@ -102,7 +102,7 @@ class TimeoutFilter(nWays: Int, nSets: Int, nCores: Int, repSetFormat: BaseRepla
     }
 
     wRefreshTimers := newRefreshTimers
-  } .otherwise{
+  }.otherwise {
     val newRefreshTimers = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
     for (way <- 0 until nWays) {
       when(way.U === refreshWayIdx && (refreshVal > io.setIdxTimers(way))) {

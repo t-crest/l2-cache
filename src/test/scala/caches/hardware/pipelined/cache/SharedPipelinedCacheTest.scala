@@ -449,7 +449,13 @@ object Tests {
     CacheRequest(coreId = 3, reqId = 44, tag = 67, index = 51, blockOffset = 3, rw = false, expectedData = Some("deadbeef3f17911b3db7e6a0a19f928d")), // HIT, way: 7
     CacheRequest(coreId = 0, reqId = 45, tag = 72, index = 51, blockOffset = 2, rw = false, expectedData = Some("a7dd374354aafffed70ed97ed77322b5")), // MISS, way: 0 *
     CacheRequest(coreId = 1, reqId = 46, tag = 69, index = 51, blockOffset = 1, rw = false, expectedData = Some("deadbeefbf622032026a1da9617116da")), // MISS, way: 1
-    // TODO: Add a test case in here, for when a memory interface pops an entry from miss-Q and at the same time a half miss is in the last REP stage
+    Stall(100),
+    CacheRequest(coreId = 3, reqId = 47, tag = 11, index = 51, blockOffset = 3, rw = false, expectedData = Some("02bb1e9cc2ee3442e734d36062da8b7c")), // MISS, way: ?
+    CacheRequest(coreId = 0, reqId = 48, tag = 12, index = 51, blockOffset = 2, rw = false, expectedData = Some("12dd168ddb48e19becad5c7f10687217")), // MISS, way: ?
+    CacheRequest(coreId = 1, reqId = 49, tag = 13, index = 51, blockOffset = 1, rw = false, expectedData = Some("4635b5934c7c2bb10add1a0f819c1d9f")), // MISS, way: ?
+    Stall(20),
+    CacheRequest(coreId = 3, reqId = 50, tag = 11, index = 51, blockOffset = 0, rw = false, expectedData = Some("54cb18195431b8ab8cbeea7361718def")), // MISS, way: ?
+    CacheRequest(coreId = 3, reqId = 51, tag = 11, index = 51, blockOffset = 1, rw = false, expectedData = Some("cac861a11c3d1fa89f55d6260fee6b9a")), // MISS, way: ?
   )
 }
 
@@ -683,11 +689,6 @@ object SharedPipelinedCacheTest {
       case ExpectFinishedRejectedResponse(_, _, _) => true
       case _ => false
     }
-
-    // TODO: Group all requests by core ID, and issue request for each core at a same time,
-    //  do not issue more requests for the same core if did not receive a response,
-    //  add dependency for PerformSchedulerOperation action so it only executes it after a response to some
-    //  request has been received
 
     while (currentCC < maxCCs && receivedResponseCnt != expectedRespCnt) {
 

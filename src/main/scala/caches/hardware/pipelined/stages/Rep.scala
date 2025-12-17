@@ -1,10 +1,10 @@
 package caches.hardware.pipelined.stages
 
+import caches.hardware.pipelined.{MshrInfoIO, MshrPushIO, RejectionQueueEntry, WbFifoInfoIO}
+import caches.hardware.reppol._
+import caches.hardware.util._
 import chisel3._
 import chisel3.util._
-import caches.hardware.util._
-import caches.hardware.reppol._
-import caches.hardware.pipelined.{MshrInfoIO, MshrPushIO, RejectionQueueEntry, WbFifoInfoIO}
 
 class MshrInfoCheck(tagWidth: Int, nWays: Int, nSets: Int, nMshrs: Int) extends Module() {
   val io = IO(new Bundle {
@@ -145,7 +145,7 @@ class Rep(nCores: Int, nSets: Int, nWays: Int, nMshrs: Int, reqIdWidth: Int, tag
     newDirtyBits := inDirty
     newTags := inTags
 
-    when (io.setLineValid.refill && io.setLineValid.index === currIdx) {
+    when(io.setLineValid.refill && io.setLineValid.index === currIdx) {
       newTags(io.setLineValid.way) := io.setLineValid.tag
     }
 
@@ -236,8 +236,6 @@ class Rep(nCores: Int, nSets: Int, nWays: Int, nMshrs: Int, reqIdWidth: Int, tag
   val indexReg2 = PipelineReg(indexReg1, 0.U, !io.stall, io.repPolCtrl.insertBubble)
   val tagReg2 = PipelineReg(tagReg1, 0.U, !io.stall, io.repPolCtrl.insertBubble)
 
-  // TODO: Think if we want to bring back the updating of hit in here?
-  //  we can check if it became a hit, if so not update replacement policy
   // ---------------- Update Replacement policy ----------------
   val repWay = io.repPolCtrl.replaceWay
   val repWayValid = io.repPolCtrl.isValid
@@ -333,7 +331,7 @@ class Rep(nCores: Int, nSets: Int, nWays: Int, nMshrs: Int, reqIdWidth: Int, tag
   io.read.reqId := reqIdReg2
   io.read.reqRw := reqRwReg2
   io.read.wData := wDataReg2
-  io.read.byteEn := blockByteMask((blockWidth / 8) -1, 0)
+  io.read.byteEn := blockByteMask((blockWidth / 8) - 1, 0)
   io.read.repValid := repWayValid
   io.read.repWay := readRepWay
   io.read.isHit := isReqHitReg2 || hitWithoutUpdate

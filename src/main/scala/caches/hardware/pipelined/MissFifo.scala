@@ -88,9 +88,9 @@ class MshrPushDemux(nCores: Int, nCmds: Int, nWays: Int, reqIdWidth: Int, tagWid
   io.out2 <> 0.U.asTypeOf(io.out2)
   io.out1 <> 0.U.asTypeOf(io.out1)
 
-  when (io.sel === 0.U) {
+  when(io.sel === 0.U) {
     io.out1 <> io.in
-  } .otherwise {
+  }.otherwise {
     io.out2 <> io.in
   }
 }
@@ -103,7 +103,7 @@ class MshrPopMux(nCores: Int, nCmds: Int, nWays: Int, reqIdWidth: Int, tagWidth:
     val out = new MshrPopIO(nCores, nCmds, nWays, reqIdWidth, tagWidth, indexWidth, blockOffsetWidth, blockWidth)
   })
 
-  when (io.sel === 0.U) {
+  when(io.sel === 0.U) {
     io.in1.pop := io.out.pop
     io.in1.reading := io.out.reading
     io.out.popEntry := io.in1.popEntry
@@ -113,7 +113,7 @@ class MshrPopMux(nCores: Int, nCmds: Int, nWays: Int, reqIdWidth: Int, tagWidth:
 
     io.in2.pop := false.B
     io.in2.reading := false.B
-  } .otherwise {
+  }.otherwise {
     io.in2.pop := io.out.pop
     io.in2.reading := io.out.reading
     io.out.popEntry := io.in2.popEntry

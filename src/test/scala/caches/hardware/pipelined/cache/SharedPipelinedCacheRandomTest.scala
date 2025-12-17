@@ -1,12 +1,13 @@
 package caches.hardware.pipelined.cache
 
-import caches.hardware.pipelined.cache.SharedPipelinedCacheTest._
+import SharedPipelinedCacheTest._
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.collection.mutable
 import scala.io.Source
 import scala.util.Random
+
 
 class SharedPipelinedCacheRandomTest extends AnyFlatSpec with ChiselScalatestTester {
   def generateRandomTestCase(nCores: Int, maxTag: Int, maxIdx: Int, nSubBlocks: Int, bytesPerBlock: Int, bytesPerSubBlock: Int, memFile: String, setCore0Crit: Boolean = false, testActionsLen: Int = 100): Array[TestAction] = {

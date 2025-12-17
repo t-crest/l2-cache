@@ -1,9 +1,9 @@
 package caches.hardware.pipelined
 
-import ocp.{OcpCmd, OcpResp}
 import caches.hardware.reppol.{BasePolicies, ContentionReplacementPolicy}
 import chisel3._
 import chiseltest._
+import ocp.{OcpCmd, OcpResp}
 import org.scalatest.flatspec.AnyFlatSpec
 
 class OcpCacheWrapperTest extends AnyFlatSpec with ChiselScalatestTester {

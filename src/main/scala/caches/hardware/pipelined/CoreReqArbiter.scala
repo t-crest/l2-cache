@@ -1,11 +1,11 @@
 package caches.hardware.pipelined
 
+import caches.hardware.util.DecoupledMux
 import chisel3._
 import chisel3.util._
-import caches.hardware.util.DecoupledMux
 
 /**
- * Core request arbiter. The arbiter always prioritizes the first request entry to handshake with.
+ * Core to cache request arbiter. The arbiter always prioritizes the first request entry to handshake with.
  */
 class CoreReqArbiter(nCores: Int, addrWidth: Int, dataWidth: Int, reqIdWidth: Int) extends Module {
   val io = IO(new Bundle {

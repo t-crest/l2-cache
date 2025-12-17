@@ -4,7 +4,7 @@ import caches.hardware.pipelined.CacheMemoryControllerIO
 import chisel3._
 import chisel3.util._
 
-class DummyDRAM(addrWidth: Int, blockWidth: Int, beatSize: Int, burstLen: Int, dataFile: Option[String] = None) extends Module {
+class TestDRAM(addrWidth: Int, blockWidth: Int, beatSize: Int, burstLen: Int, dataFile: Option[String] = None) extends Module {
   require((blockWidth * 8) > beatSize, "Block width must be greater than beat size.")
 
   val io = IO(Flipped(new CacheMemoryControllerIO(addrWidth, beatSize)))

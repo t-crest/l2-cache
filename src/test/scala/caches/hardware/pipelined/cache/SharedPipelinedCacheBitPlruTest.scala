@@ -1,8 +1,9 @@
 package caches.hardware.pipelined.cache
 
-import caches.hardware.pipelined.cache.SharedPipelinedCacheTest._
+import SharedPipelinedCacheTest._
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
+
 
 class SharedPipelinedCacheBitPlruTest extends AnyFlatSpec with ChiselScalatestTester {
   "SharedPipelinedCache" should "process pipelined requests for 8 ways, 128 sets, with bit plru policy" in {
@@ -60,7 +61,7 @@ class SharedPipelinedCacheBitPlruTest extends AnyFlatSpec with ChiselScalatestTe
         cache.indexWidth,
         cache.blockOffsetWidth,
         cache.byteOffsetWidth,
-        1000
+        1500
       )
 
       dut.clock.step()

@@ -1,9 +1,9 @@
 package caches.hardware.pipelined
 
-import ocp._
 import caches.hardware.reppol._
 import chisel3._
 import chisel3.util._
+import ocp._
 
 class OcpCoreSlaveToSchedulerAdapter(nCores: Int, dataWidth: Int) extends Module() {
   val io = IO(new Bundle {

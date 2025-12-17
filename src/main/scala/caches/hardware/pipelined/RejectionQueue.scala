@@ -1,8 +1,8 @@
 package caches.hardware.pipelined
 
+import chisel.lib.fifo.RegFifo
 import chisel3._
 import chisel3.util._
-import chisel.lib.fifo.RegFifo
 
 class RejectionQueueEntry(nCores: Int, addrWidth: Int, dataWidth: Int, reqIdWidth: Int) extends Bundle {
   val coreId = Input(UInt(log2Up(nCores).W))
@@ -13,6 +13,15 @@ class RejectionQueueEntry(nCores: Int, addrWidth: Int, dataWidth: Int, reqIdWidt
   val wData = Input(UInt(dataWidth.W))
 }
 
+/**
+ * Queue for requests rejected by the L2 replacement policy.
+ *
+ * @param nCores
+ * @param addrWidth
+ * @param dataWidth
+ * @param reqIdWidth
+ * @param depth
+ */
 class RejectionQueue(nCores: Int, addrWidth: Int, dataWidth: Int, reqIdWidth: Int, depth: Int) extends Module {
   val io = IO(new Bundle {
     val push = Input(Bool())

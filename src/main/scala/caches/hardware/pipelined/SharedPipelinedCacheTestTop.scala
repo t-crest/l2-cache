@@ -1,9 +1,9 @@
 package caches.hardware.pipelined
 
+import caches.hardware.reppol._
+import caches.hardware.util.TestDRAM
 import chisel3._
 import chisel3.util._
-import caches.hardware.reppol._
-import caches.hardware.util.DummyDRAM
 
 class SharedCachePort(nCores: Int, reqIdWidth: Int, addrWidth: Int, dataWidth: Int) extends Bundle {
   val cores = Vec(nCores, new CacheCorePortIO(addrWidth, dataWidth, reqIdWidth))
@@ -56,7 +56,7 @@ class SharedPipelinedCacheTestTop(
   })
 
   // The dummy memory is sub-block addressable
-  val memory = Module(new DummyDRAM(addressWidth - log2Ceil(memBeatSize), bytesPerBlock * 8, memBeatSize, memBurstLen, dataFile))
+  val memory = Module(new TestDRAM(addressWidth - log2Ceil(memBeatSize), bytesPerBlock * 8, memBeatSize, memBurstLen, dataFile))
 
   for (coreIdx <- 0 until nCores) {
     arbiter.io.ports(coreIdx).reqId <> io.requests.cores(coreIdx).req.reqId

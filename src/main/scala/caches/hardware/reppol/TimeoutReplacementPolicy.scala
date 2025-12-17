@@ -6,7 +6,7 @@ import chisel3._
 import chisel3.util._
 
 class TimerUpdateCtrl(nWays: Int, nSets: Int) extends Module {
-  val io = IO (new Bundle {
+  val io = IO(new Bundle {
     val bubble = Input(Bool())
     val refresh = Input(Bool())
     val reqCoreSetIdx = Input(UInt(log2Up(nSets).W))
@@ -36,7 +36,7 @@ class TimerUpdateCtrl(nWays: Int, nSets: Int) extends Module {
     }.otherwise {
       rIdx := io.oldDecIdx
     }
-  } .otherwise {
+  }.otherwise {
     wTimers := io.decTimers
     decIdx := decIdx + 1.U
     wIdx := io.oldDecIdx
@@ -75,14 +75,14 @@ class CoreTimeoutTable(nCores: Int) extends Module {
 }
 
 class TimerMemory(nWays: Int, nSets: Int) extends Module {
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     val stall = Input(Bool())
     val rIdx1 = Input(UInt(log2Up(nSets).W))
     val rIdx2 = Input(UInt(log2Up(nSets).W))
     val wrEn = Input(Bool())
     val wIdx = Input(UInt(log2Up(nSets).W))
     val wData = Input(Vec(nWays, UInt(TIMEOUT_LIMIT_WIDTH.W)))
-//    val wMask = Input(Vec(nWays, Bool()))
+    //    val wMask = Input(Vec(nWays, Bool()))
     val rTimers1 = Output(Vec(nWays, UInt(TIMEOUT_LIMIT_WIDTH.W)))
     val rTimers2 = Output(Vec(nWays, UInt(TIMEOUT_LIMIT_WIDTH.W)))
   })
@@ -92,7 +92,7 @@ class TimerMemory(nWays: Int, nSets: Int) extends Module {
   val rTimers1 = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
   val rTimers2 = VecInit(Seq.fill(nWays)(0.U(TIMEOUT_LIMIT_WIDTH.W)))
   for (wayIdx <- 0 until nWays) {
-//    val wrWayEn = io.wMask(wayIdx)
+    //    val wrWayEn = io.wMask(wayIdx)
 
     timers(wayIdx).io.wrEn := io.wrEn //&& wrWayEn
     timers(wayIdx).io.readAddr1 := io.rIdx1

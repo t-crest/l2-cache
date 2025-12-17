@@ -1,9 +1,9 @@
 package caches.hardware.pipelined
 
+import caches.hardware.pipelined.stages.{Dec, Read, Rep, Tag, UpdateUnit}
+import caches.hardware.reppol._
 import chisel3._
 import chisel3.util._
-import caches.hardware.reppol._
-import caches.hardware.pipelined.stages.{Dec, Read, Rep, Tag, UpdateUnit}
 
 class CacheRequestIO(addrWidth: Int, dataWidth: Int, reqIdWidth: Int) extends Bundle {
   val reqId = Flipped(Decoupled(UInt(reqIdWidth.W)))
@@ -24,6 +24,8 @@ class CacheCorePortIO(addrWidth: Int, dataWidth: Int, reqIdWidth: Int) extends B
 }
 
 /**
+ * Top level module for the shared cache.
+ *
  * @param memBeatSize beat size in bytes
  * @param memBurstLen number of beats in a burst
  */
@@ -97,7 +99,7 @@ class SharedPipelinedCache(
     repPol.printConfig() // Print configuration of replacement policy
   }
 
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     val core = new CacheCorePortIO(addressWidth, bytesPerSubBlock * 8, reqIdWidth)
     val inCoreId = Input(UInt(log2Up(nCores).W))
     val outCoreId = Output(UInt(log2Up(nCores).W))

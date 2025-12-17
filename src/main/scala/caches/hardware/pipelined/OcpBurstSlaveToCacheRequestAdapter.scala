@@ -1,8 +1,8 @@
 package caches.hardware.pipelined
 
-import ocp._
 import chisel3._
 import chisel3.util._
+import ocp._
 
 class OcpBurstSlaveToCacheRequestAdapter(addrWidth: Int, dataWidth: Int, burstLen: Int) extends Module {
   val io = IO(new Bundle {

@@ -1,8 +1,9 @@
 package caches.hardware.pipelined.cache
 
-import caches.hardware.pipelined.cache.SharedPipelinedCacheTest._
+import SharedPipelinedCacheTest._
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
+
 
 class SharedPipelinedCacheTreePlruTest extends AnyFlatSpec with ChiselScalatestTester {
   "SharedPipelinedCache" should "process pipelined requests for 8 ways, 128 sets, with tree plru policy" in {

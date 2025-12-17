@@ -1,9 +1,10 @@
 package caches.hardware.pipelined.cache
 
-import caches.hardware.pipelined.cache.SharedPipelinedCacheTest._
+import SharedPipelinedCacheTest._
 import chisel3.stage.PrintFullStackTraceAnnotation
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
+
 
 class SharedPipelinedCacheWbTest extends AnyFlatSpec with ChiselScalatestTester {
   "SharedPipelinedCache" should "work with wb contention events" in {

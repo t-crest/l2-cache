@@ -1,8 +1,8 @@
 package caches.hardware.pipelined
 
-import ocp._
 import chisel3._
 import chisel3.util._
+import ocp._
 
 class OcpCacheWrapperPort(
                            nCores: Int,
@@ -18,6 +18,9 @@ class OcpCacheWrapperPort(
   val scheduler = new OcpCoreSlavePort(log2Up(nCores), schedulerDataWidth)
 }
 
+/**
+ * Wrapper that wraps the l2 cache into the OCP interface.
+ */
 class OcpCacheWrapper(
                        nCores: Int,
                        addrWidth: Int,

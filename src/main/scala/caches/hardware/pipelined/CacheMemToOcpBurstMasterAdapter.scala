@@ -1,8 +1,8 @@
 package caches.hardware.pipelined
 
-import ocp._
 import chisel3._
 import chisel3.util._
+import ocp._
 
 /**
  * Wrapper for the L2 cache to the OCP burst interface.

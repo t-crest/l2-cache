@@ -1,7 +1,7 @@
 package caches.hardware.pipelined.stages
 
-import caches.hardware.pipelined.{CacheMemory, WbFifoPushIO}
 import caches.hardware.util.PipelineReg
+import caches.hardware.pipelined.{CacheMemory, WbFifoPushIO}
 import chisel3._
 import chisel3.util._
 

@@ -2,8 +2,8 @@ package caches.hardware.pipelined
 
 import chisel3._
 import chiseltest._
-import org.scalatest.flatspec.AnyFlatSpec
 import ocp.{OcpCmd, OcpResp}
+import org.scalatest.flatspec.AnyFlatSpec
 
 class OcpBurstSlaveToCacheRequestAdapterTest extends AnyFlatSpec with ChiselScalatestTester {
   "OcpBurstSlaveAdapter" should "work" in {

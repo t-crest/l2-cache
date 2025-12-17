@@ -1,8 +1,9 @@
 package caches.hardware.pipelined.cache
 
-import caches.hardware.pipelined.cache.SharedPipelinedCacheTest._
+import SharedPipelinedCacheTest._
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
+
 
 class SharedPipelinedCacheStressTest extends AnyFlatSpec with ChiselScalatestTester {
   "SharedPipelinedCache" should "handle stress test with bit plru policy" in {

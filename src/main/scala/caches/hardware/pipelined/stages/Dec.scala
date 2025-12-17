@@ -1,8 +1,8 @@
 package caches.hardware.pipelined.stages
 
+import caches.hardware.util._
 import chisel3._
 import chisel3.util._
-import caches.hardware.util._
 
 class DecIO(nCores: Int, reqIdWidth: Int, addrWidth: Int, subBlockWidth: Int) extends Bundle() {
   val coreId = Input(UInt(log2Up(nCores).W))
@@ -17,7 +17,7 @@ class DecIO(nCores: Int, reqIdWidth: Int, addrWidth: Int, subBlockWidth: Int) ex
 class Dec(nCores: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffWidth: Int, byteOffWidth: Int, subBlockWidth: Int) extends Module() {
   private val addrWidth = tagWidth + indexWidth + blockOffWidth + byteOffWidth
 
-  val io = IO(new Bundle{
+  val io = IO(new Bundle {
     val dec = new DecIO(nCores, reqIdWidth, addrWidth, subBlockWidth)
     val tag = Flipped(new TagIO(nCores, reqIdWidth, tagWidth, indexWidth, blockOffWidth, subBlockWidth))
     val stall = Input(Bool())

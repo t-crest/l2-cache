@@ -76,7 +76,7 @@ class CoreContentionTable(nCores: Int) extends Module() {
     when(!io.stall) {
       when(io.wrEns(0) && coreTableIdx.U === io.wrCoreIds(0)) {
         contentionLimits(coreTableIdx) := io.wrCoreLimits(0)
-      } .elsewhen(io.wrEns(1) && coreTableIdx.U === io.wrCoreIds(1)) {
+      }.elsewhen(io.wrEns(1) && coreTableIdx.U === io.wrCoreIds(1)) {
         contentionLimits(coreTableIdx) := io.wrCoreLimits(1)
       }
     }
@@ -137,15 +137,15 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   val evictVal1 = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
   val evictVal2 = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
   // NOTE: No underflow can happen here since an eviction event is not triggered if the core limit is 0
-  when (io.evict && io.evictionEvent) { // io.evict needed here
+  when(io.evict && io.evictionEvent) { // io.evict needed here
     when(doesReqCoreOwnFirstUcWay) {
       evictVal1 := io.coreLimits(io.reqCore) - 1.U
-    } .otherwise {
+    }.otherwise {
       evictVal1 := io.coreLimits(io.reqCore)
       evictVal2 := io.coreLimits(io.firstUcSetWayCore) - 1.U
       updtCore2En := true.B
     }
-  } .otherwise{
+  }.otherwise {
     evictVal1 := io.coreLimits(io.reqCore)
   }
 

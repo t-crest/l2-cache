@@ -1,8 +1,8 @@
 package caches.hardware.pipelined.stages
 
+import caches.hardware.pipelined.CacheResponseIO
 import chisel3._
 import chisel3.util._
-import caches.hardware.pipelined.CacheResponseIO
 
 /**
  * IO interface from the read stage to the update stage
@@ -109,7 +109,7 @@ class UpdateUnit(nCores: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexW
 
     when(io.memoryInterface.validCmd) {
       coreRespValid := true.B // Respond to the request if it is a valid command
-    } .otherwise {
+    }.otherwise {
       stall := true.B
       refill := true.B
       wrEn := true.B

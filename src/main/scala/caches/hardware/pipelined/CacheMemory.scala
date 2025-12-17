@@ -6,9 +6,10 @@ import chisel3.util._
 
 /**
  * Cache memory module with byte-level write enable.
- * @param sizeInBytes Size of the cache memory in bytes
- * @param nWays Number of ways (associativity) in the cache
- * @param bytesPerBlock Number of bytes per cache block
+ *
+ * @param sizeInBytes      Size of the cache memory in bytes
+ * @param nWays            Number of ways (associativity) in the cache
+ * @param bytesPerBlock    Number of bytes per cache block
  * @param bytesPerSubBlock Number of bytes per sub-block
  */
 class CacheMemory(sizeInBytes: Int, nWays: Int, bytesPerBlock: Int, bytesPerSubBlock: Int) extends Module {
