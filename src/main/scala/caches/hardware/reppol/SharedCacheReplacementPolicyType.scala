@@ -21,6 +21,7 @@ object SchedulerCmd {
   val NULL = "b00".U(schedulerCmdWidth.W)
   val RD = "b01".U(schedulerCmdWidth.W)
   val WR = "b10".U(schedulerCmdWidth.W)
+  val RST = "b11".U(schedulerCmdWidth.W)
 }
 
 class SchedulerControlIO(nCores: Int, dataWidth: Int) extends Bundle {

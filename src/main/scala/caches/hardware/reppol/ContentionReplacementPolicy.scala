@@ -61,6 +61,7 @@ class CoreContentionTable(nCores: Int) extends Module() {
     val rLimits = Output(Vec(nCores, UInt(CONTENTION_LIMIT_WIDTH.W)))
     val rCritCores = Output(Vec(nCores, Bool()))
     val freeRejectionQueue = Output(Bool())
+    val allowLineAssignment = Output(Bool())
   })
 
   // NOTE: There is no forwarding here, if a core is set or unset as critical,
@@ -106,6 +107,9 @@ class CoreContentionTable(nCores: Int) extends Module() {
   io.rCritCores := criticalCores
   io.freeRejectionQueue := freeRejQueue
   io.readData := readData
+  // A temporary fix to prevent non-critical cores to assign lines to themselves and then when set as critical,
+  // own more of the cache than expected
+  io.allowLineAssignment := criticalCores.reduce((x, y) => x || y)
 }
 
 class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean = false, enaWb: Boolean = false, enaPrec: Boolean = false) extends Module() {
@@ -254,6 +258,7 @@ class ContentionReplacementPolicy(
   // Need to delay this signal by two CCs since the bit plru uses memory to store the MRU bits
   val idxDelayReg = PipelineReg(io.control.setIdx, 0.U, !io.control.stall && !wbStageInsertBubble)
   val fwdMruBits = wbStageSetIdx === idxDelayReg && io.control.update
+  val allowLineAssignment = WireDefault(false.B)
 
   basePolRead.io.stall := io.control.stall || wbStageInsertBubble
   basePolRead.io.rIdx := io.control.setIdx
@@ -262,9 +267,10 @@ class ContentionReplacementPolicy(
   basePolRead.io.wData := wbStageMruBits
   basePolRead.io.fwd := fwdMruBits
 
+  // TODO: Need to find a way to reset the assignment memory
   assignArr.io.stall := io.control.stall || wbStageInsertBubble
   assignArr.io.rSet := idxDelayReg
-  assignArr.io.wrEn := io.control.evict
+  assignArr.io.wrEn := io.control.evict && allowLineAssignment
   assignArr.io.wrSet := wbStageSetIdx
   assignArr.io.wrWay := wbStageRepWay
   assignArr.io.wrLineAssign := wbStageUpdateCore
@@ -300,6 +306,7 @@ class ContentionReplacementPolicy(
   coreTable.io.wrCoreIds(1) := coreLimitUpdtCtrl.io.updtCore2
   coreTable.io.wrCoreLimits(0) := coreLimitUpdtCtrl.io.updtCore1Val
   coreTable.io.wrCoreLimits(1) := coreLimitUpdtCtrl.io.updtCore2Val
+  allowLineAssignment := coreTable.io.allowLineAssignment
 
   // Update base policy
   basePolUpdate.io.hit := io.info.isHit
