@@ -107,8 +107,7 @@ class CoreContentionTable(nCores: Int) extends Module() {
   io.rCritCores := criticalCores
   io.freeRejectionQueue := freeRejQueue
   io.readData := readData
-  // A temporary fix to prevent non-critical cores to assign lines to themselves and then when set as critical,
-  // own more of the cache than expected
+  // A temporary fix to prevent non-critical cores from assigning lines to themselves prior to being set as critical
   io.allowLineAssignment := criticalCores.reduce((x, y) => x || y)
 }
 
@@ -137,22 +136,28 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   val isReqCoreCritical = io.criticalCores(io.reqCore)
   val doesReqCoreOwnFirstUcWay = io.firstUcSetWayCore === io.reqCore
 
-  // Decrement the contention limit when we encounter an eviction or replacement event
+  // Decrement the contention limit when we encounter an eviction or replacement event.
+  // The first value is if the requesting core is decrementing its contention limit
+  // And the second value is for when the requesting core is decrementing some other core's contention limit.
   val evictVal1 = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
   val evictVal2 = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
+
   // NOTE: No underflow can happen here since an eviction event is not triggered if the core limit is 0
+  val ucCoreDecrLimit = io.coreLimits(io.firstUcSetWayCore) - 1.U
+  val reqCoreLimit = io.coreLimits(io.reqCore)
   when(io.evict && io.evictionEvent) { // io.evict needed here
     when(doesReqCoreOwnFirstUcWay) {
-      evictVal1 := io.coreLimits(io.reqCore) - 1.U
+      evictVal1 := ucCoreDecrLimit
     }.otherwise {
-      evictVal1 := io.coreLimits(io.reqCore)
-      evictVal2 := io.coreLimits(io.firstUcSetWayCore) - 1.U
+      evictVal1 := reqCoreLimit
+      evictVal2 := ucCoreDecrLimit
       updtCore2En := true.B
     }
   }.otherwise {
-    evictVal1 := io.coreLimits(io.reqCore)
+    evictVal1 := reqCoreLimit
   }
 
+  // Precedent event will never happen at the same time as any other event
   val precVal = WireDefault(0.U(CONTENTION_LIMIT_WIDTH.W))
   if (enaPrec) {
     // If the core whose way we hit is not owned by a critical core, then we increment the contention limit.
@@ -160,6 +165,7 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
     val ownerCore = io.lineAssignments(io.hitWayIdx)
     val ownerValid = io.validLineAssignments(io.hitWayIdx)
     val precedentEvent = isReqCoreCritical && !io.criticalCores(ownerCore) && ownerValid && io.isHit
+
     val incrEvictVal1 = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
     incrEvictVal1 := evictVal1 + 1.U
     val overflow = incrEvictVal1(CONTENTION_LIMIT_WIDTH) === 1.U
@@ -176,10 +182,7 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   // Trigger Miss-In-Miss and Miss-Q events
   val mimVal = WireDefault(0.U((log2Up(nMshrs) + 1).W))
   if (enaMim) {
-    // We check if there are any non-critical misses ahead and if the requesting core is critical
-    val missInMissEvent = isReqCoreCritical && io.nonCritMisses =/= 0.U
-
-    when(missInMissEvent) {
+    when(isReqCoreCritical) {
       mimVal := io.nonCritMisses
     }
   }
@@ -187,10 +190,7 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   // Writeback event
   val wbVal = WireDefault(0.U((log2Up(nMshrs) + 1).W))
   if (enaWb) {
-    // We check if there are any non-critical WBs and if the requesting core is critical
-    val wbEvent = isReqCoreCritical && io.nonCritWbs =/= 0.U
-
-    when(wbEvent) {
+    when(isReqCoreCritical) {
       wbVal := io.nonCritWbs
     }
   }
@@ -205,8 +205,8 @@ class CoreLimitUpdateCtrl(nCores: Int, nWays: Int, nMshrs: Int, enaMim: Boolean 
   val evictValSubWbMimRes = WireDefault(0.U((CONTENTION_LIMIT_WIDTH + 1).W))
   evictValSubWbMimRes := evictVal1 - wbMimRes
   val underflow = evictValSubWbMimRes(CONTENTION_LIMIT_WIDTH)
-  val evictWbMimRes = Mux(underflow, evictVal1, evictVal1 - wbMimRes)
 
+  val evictWbMimRes = Mux(underflow, 0.U, evictValSubWbMimRes)
   val reqCoreUpdtVal = Mux(io.evict, evictWbMimRes, precVal)
 
   io.updtCore1Val := reqCoreUpdtVal

@@ -95,6 +95,8 @@ class UpdateUnit(nCores: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexW
   val updateWriteByteMask = WireDefault(0.U((blockWidth / 8).W))
 
   when(io.memoryInterface.valid) {
+    stall := true.B
+
     updateTag := io.memoryInterface.tag
     updateIndex := io.memoryInterface.index
     updateWay := io.memoryInterface.wWay
@@ -110,7 +112,6 @@ class UpdateUnit(nCores: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexW
     when(io.memoryInterface.validCmd) {
       coreRespValid := true.B // Respond to the request if it is a valid command
     }.otherwise {
-      stall := true.B
       refill := true.B
       wrEn := true.B
     }

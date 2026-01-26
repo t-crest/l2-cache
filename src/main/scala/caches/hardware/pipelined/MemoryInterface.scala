@@ -81,7 +81,6 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
   val reqTag = WireDefault(0.U(tagWidth.W))
 
   // Default signal assignments
-  val readingPopEntry = WireDefault(false.B)
   val memRAddrValid = WireDefault(false.B)
   val memRDataReady = WireDefault(false.B)
   val memWAddrValid = WireDefault(false.B)
@@ -189,7 +188,6 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
         missFifoPop := true.B
         stateReg := sIdle
         totalBurstCount := 0.U
-        readingPopEntry := true.B
       }.otherwise {
         updateLogicValidCmd := true.B
         halfMissCmdCounter := halfMissCmdCounter + 1.U
@@ -205,7 +203,6 @@ class MemoryInterface(nCores: Int, nWays: Int, nHalfMissCmds: Int, reqIdWidth: I
 
   io.wbFifo.pop := wbFifoPop
   io.missFifo.pop := missFifoPop
-  io.missFifo.reading := readingPopEntry
 
   io.updateLogic.valid := updateLogicValid
   io.updateLogic.validCmd := updateLogicValidCmd

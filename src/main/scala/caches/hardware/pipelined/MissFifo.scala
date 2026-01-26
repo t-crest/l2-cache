@@ -52,7 +52,6 @@ class MshrPushIO(nCores: Int, nMshrs: Int, nWays: Int, reqIdWidth: Int, tagWidth
 
 class MshrPopIO(nCores: Int, nCmds: Int, nWays: Int, reqIdWidth: Int, tagWidth: Int, indexWidth: Int, blockOffsetWidth: Int, blockWidth: Int) extends Bundle() {
   val pop = Input(Bool())
-  val reading = Input(Bool()) // Indicate that the memory interface is reading the pop entry and that no new data should be added to it
   val popEntry = Flipped(new LineRequestIO(nCores, nWays, tagWidth, indexWidth, blockWidth))
   val cmds = Output(Vec(nCmds, new CacheCmdIO(nCores, reqIdWidth, blockOffsetWidth)))
   val cmdCnt = Output(UInt((log2Up(nCmds) + 1).W))
@@ -105,24 +104,20 @@ class MshrPopMux(nCores: Int, nCmds: Int, nWays: Int, reqIdWidth: Int, tagWidth:
 
   when(io.sel === 0.U) {
     io.in1.pop := io.out.pop
-    io.in1.reading := io.out.reading
     io.out.popEntry := io.in1.popEntry
     io.out.cmds := io.in1.cmds
     io.out.cmdCnt := io.in1.cmdCnt
     io.out.empty := io.in1.empty
 
     io.in2.pop := false.B
-    io.in2.reading := false.B
   }.otherwise {
     io.in2.pop := io.out.pop
-    io.in2.reading := io.out.reading
     io.out.popEntry := io.in2.popEntry
     io.out.cmds := io.in2.cmds
     io.out.cmdCnt := io.in2.cmdCnt
     io.out.empty := io.in2.empty
 
     io.in1.pop := false.B
-    io.in1.reading := false.B
   }
 }
 
@@ -310,10 +305,6 @@ class MshrQueue(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: In
   val validMshrs = VecInit(Seq.fill(nMshrs)(false.B))
   validMshrs := reqQueue.io.validMSHRs
 
-  when(io.pop.reading) {
-    validMshrs(reqQueue.io.rdPtr) := false.B
-  }
-
   io.push.full := reqQueue.io.full
 
   io.info.wrPtr := reqQueue.io.wrPtr
@@ -364,13 +355,14 @@ class MissFifo(nCores: Int, nCmds: Int, nMshrs: Int, nWays: Int, reqIdWidth: Int
     // told to evict too. For instance, a non-critical request can evict way 2, so it is pushed to non-critical fifo; then
     // a critical request whose core has reached contention limit is told to evict the same way: 2 (most likely since any
     // other ways are already owned by critical cores); then the critical way evicts this line first followed by a
-    // non-critical way evicting this line later on. This creates a additional contention, since if this line is later on
+    // non-critical way evicting this line later on. This creates an additional contention, since if this line is later on
     // needed by a critical core, it will have to refetch again, thus resulting in two line accesses from the main memory
     // for a critical core.
     // NOTE: This is a rather rare case.
 
     val anyMatchingReqsInNonCrit = VecInit(Seq.fill(nMshrs)(false.B))
     val critPopValid = !critQueue.io.pop.empty
+
     for (mshrIdx <- 0 until nMshrs) {
       val nonCritValid = nonCritQueue.io.info.validMshrs(mshrIdx)
       val conflict = critPopValid && nonCritValid && nonCritQueue.io.info.currentIndexes(mshrIdx) === critQueue.io.pop.popEntry.index && nonCritQueue.io.info.replacementWays(mshrIdx) === critQueue.io.pop.popEntry.replaceWay
