@@ -56,7 +56,6 @@ class SharedPipelinedCacheSynthTop(
 
   private val schedulerAddrWidth = log2Up(nCores)
   private val schedulerDataWidth = l2Cache.l2SchedulerDataWidth
-  private val schedulerByteEnWidth = schedulerDataWidth / 8
 
   val io = IO(new Bundle {
     val serialInCores = Input(UInt(1.W))
@@ -69,7 +68,7 @@ class SharedPipelinedCacheSynthTop(
   private val coreInShiftRegisterWidth = 3 + addrWidth + coreDataWidth + coreByteEnWidth + 1
   val coresInShiftReg = Reg(UInt((nCores * coreInShiftRegisterWidth).W))
   val memInShiftReg = Reg(UInt((2 + memDataWidth + 1 + 1).W))
-  val schedulerInShiftReg = Reg(UInt((3 + schedulerAddrWidth + schedulerDataWidth + schedulerByteEnWidth).W))
+  val schedulerInShiftReg = Reg(UInt((3 + schedulerAddrWidth + schedulerDataWidth).W))
 
   // Output registers
   val coresOutReg = Reg(UInt((nCores * (2 + coreDataWidth + 1 + 1)).W))
@@ -106,10 +105,10 @@ class SharedPipelinedCacheSynthTop(
   memOutReg := Cat(l2Cache.io.mem.M.Cmd, l2Cache.io.mem.M.Addr, l2Cache.io.mem.M.Data, l2Cache.io.mem.M.DataByteEn, l2Cache.io.mem.M.DataValid)
 
   // Scheduler interface
-  l2Cache.io.scheduler.M.Cmd := schedulerInShiftReg((3 + schedulerAddrWidth + schedulerDataWidth + schedulerByteEnWidth) - 1, schedulerAddrWidth + schedulerDataWidth + schedulerByteEnWidth)
-  l2Cache.io.scheduler.M.Addr := schedulerInShiftReg((schedulerAddrWidth + schedulerDataWidth + schedulerByteEnWidth) - 1, schedulerDataWidth + schedulerByteEnWidth)
-  l2Cache.io.scheduler.M.Data := schedulerInShiftReg((schedulerDataWidth + schedulerByteEnWidth) - 1, schedulerByteEnWidth)
-  l2Cache.io.scheduler.M.ByteEn := schedulerInShiftReg(schedulerByteEnWidth - 1, 0)
+  l2Cache.io.scheduler.M.Cmd := schedulerInShiftReg((3 + schedulerAddrWidth + schedulerDataWidth) - 1, schedulerAddrWidth + schedulerDataWidth)
+  l2Cache.io.scheduler.M.Addr := schedulerInShiftReg((schedulerAddrWidth + schedulerDataWidth) - 1, schedulerDataWidth)
+  l2Cache.io.scheduler.M.Data := schedulerInShiftReg(schedulerDataWidth - 1, 0)
+  l2Cache.io.scheduler.M.ByteEn := 0.U // This signal is not used by the cache, but only defined by the interface
 
   schedulerOutReg := Cat(l2Cache.io.scheduler.S.Resp, l2Cache.io.scheduler.S.Data)
 
@@ -120,7 +119,7 @@ class SharedPipelinedCacheSynthTop(
 object SharedPipelinedCacheSynthTop extends App {
   val l2Size = 65536 // 64 KiB
   val nWays = 8
-  val nCores = 4
+  val nCores = 8
   val addressWidth = 32
   val bytesPerBlock = 64
   val bytesPerSubBlock = 16
@@ -128,8 +127,9 @@ object SharedPipelinedCacheSynthTop extends App {
   val memBurstLen = 4
 
   val l2nSets = l2Size / (nWays * bytesPerBlock)
-  //  val l2RepPolicy = () => new BitPlruReplacementPolicy(nWays, l2nSets, nCores)
-  val l2RepPolicy = () => new ContentionReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, true, true, true, repSetFormat = new MruFormat)
+//  val l2RepPolicy = () => new BitPlruReplacementPolicy(nWays, l2nSets, nCores)
+//  val l2RepPolicy = () => new ContentionReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, false, true, false, repSetFormat = new MruFormat)
+  val l2RepPolicy = () => new TimeoutReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, repSetFormat = new MruFormat)
 
   println("Generating the L2 cache hardware for synthesis...")
   (new chisel3.stage.ChiselStage).emitVerilog(
