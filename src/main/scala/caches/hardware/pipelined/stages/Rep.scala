@@ -32,8 +32,8 @@ class MshrInfoCheck(tagWidth: Int, nWays: Int, nSets: Int, nMshrs: Int) extends 
     val halfMissRepWay = Output(UInt(log2Up(nWays).W))
     val reservedRepWay = Output(Bool())
     val halfMissCapacity = Output(Bool())
-    val nonCritMisses = Output(UInt(log2Up(nMshrs).W))
-    val nonCritWbs = Output(UInt(log2Up(nMshrs).W))
+    val nonCritMisses = Output(UInt(log2Up(nMshrs + 1).W)) // Needs to be able to hold nMshrs
+    val nonCritWbs = Output(UInt(log2Up(nMshrs + 1).W))
   })
 
   val nonCritMissMatches = Wire(Vec(nMshrs, Bool()))
@@ -46,8 +46,10 @@ class MshrInfoCheck(tagWidth: Int, nWays: Int, nSets: Int, nMshrs: Int) extends 
     val nonCritQIdxMatch = io.nonCritQIdxs(mshr) === io.idx
     val nonCritQValid = io.nonCritQValid(mshr)
 
-    nonCritMisses(mshr) := nonCritQValid && io.nonCritQCritCores(mshr)
-    nonCritWbs(mshr) := io.wbQValid(mshr) && io.wbQCritCores(mshr)
+    // Only entries of non-critical cores are contention: the flag of a miss entry is set when the requesting core is
+    // critical, and the flag of a write-back entry is set when the evicted line is owned by a critical core.
+    nonCritMisses(mshr) := nonCritQValid && !io.nonCritQCritCores(mshr)
+    nonCritWbs(mshr) := io.wbQValid(mshr) && !io.wbQCritCores(mshr)
     repWayMatches(mshr) := nonCritQIdxMatch && io.nonCritQRepWays(mshr) === io.repWay && nonCritQValid
     nonCritMissMatches(mshr) := nonCritQIdxMatch && io.nonCritQTags(mshr) === io.tag && nonCritQValid
     critMissMatches(mshr) := io.critQIdxs(mshr) === io.idx && io.critQTags(mshr) === io.tag && io.critQValid(mshr)

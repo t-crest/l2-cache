@@ -150,7 +150,7 @@ class RequestMshrQueue(nCores: Int, nMshrs: Int, nWays: Int, tagWidth: Int, inde
   val idxQueue = Module(new RegFifoWithStatus(UInt(indexWidth.W), nMshrs))
   val wayQueue = Module(new RegFifoWithStatus(UInt(log2Up(nWays).W), nMshrs))
   val incidentCoreQueue = Module(new RegFifoWithStatus(UInt(log2Up(nCores).W), nMshrs))
-  val isCritQueue = Module(new RegFifoWithStatus(UInt(log2Up(nCores).W), nMshrs)) // Whether the incident core is critical or not
+  val isCritQueue = Module(new RegFifoWithStatus(Bool(), nMshrs)) // Whether the incident core is critical or not
   val currWrPtr = tagQueue.io.wrPtr
   val currRdPtr = tagQueue.io.rdPtr
 
