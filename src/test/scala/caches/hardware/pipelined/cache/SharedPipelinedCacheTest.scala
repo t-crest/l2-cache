@@ -65,6 +65,8 @@ case class ContentionConfiguration(base: BasePolicyType, mim: Boolean = false, p
 
 case class TimeoutConfiguration(base: BasePolicyType) extends PolicyConfiguration
 
+case class LeastCriticalConfiguration(base: BasePolicyType, rejectNonCritical: Boolean = false) extends PolicyConfiguration
+
 object Tests {
   // Test actions for bit and tree PLRUs
   val testActions1: Array[TestAction] = Array(
@@ -616,6 +618,7 @@ object SharedPipelinedCacheTest {
       case TreePlruConfiguration() => () => buildPolicy(repSetFormat)(new TreePlruReplacementPolicy(nWays, nSets, nCores), fmt => new TreePlruReplacementPolicy(nWays, nSets, nCores, fmt))
       case ContentionConfiguration(base, mim, precedent, wb) => () => buildPolicy(repSetFormat)(new ContentionReplacementPolicy(nWays, nSets, nCores, base, mim, precedent, wb), fmt => new ContentionReplacementPolicy(nWays, nSets, nCores, base, mim, precedent, wb, repSetFormat = fmt))
       case TimeoutConfiguration(base) => () => buildPolicy(repSetFormat)(new TimeoutReplacementPolicy(nWays, nSets, nCores, base), fmt => new TimeoutReplacementPolicy(nWays, nSets, nCores, base, fmt))
+      case LeastCriticalConfiguration(base, reject) => () => new LeastCriticalReplacementPolicy(nWays, nSets, nCores, base, rejectNonCritical = reject)
       case _ => throw new Exception("Unexpected policy configuration")
     }
 
