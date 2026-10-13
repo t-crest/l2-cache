@@ -3,6 +3,8 @@ GENERATED_DIR = generated
 QUARTUS_PROJECT_DIR = quartus/SharedPipelinedCacheSynthTop
 VERILOG_FILE = SharedPipelinedCacheSynthTop.v
 QUARTUS_PROJECT_NAME = SharedPipelinedCacheSynthTop
+# Arguments of the top level generator, e.g. SYNTH_ARGS="cont 4" for the contention policy with 4 cores
+SYNTH_ARGS ?=
 
 all: test
 
@@ -30,7 +32,7 @@ build-hw: clean-generated clean-quartus generate-verilog copy-to-quartus
 generate-verilog:
 	@echo "Generating Verilog from $(SCALA_MAIN_CLASS)..."
 	@mkdir -p $(GENERATED_DIR)
-	sbt "runMain $(SCALA_MAIN_CLASS)"
+	sbt "runMain $(SCALA_MAIN_CLASS) $(SYNTH_ARGS)"
 
 # Copy generated Verilog main top level module to Quartus project
 copy-to-quartus: generate-verilog

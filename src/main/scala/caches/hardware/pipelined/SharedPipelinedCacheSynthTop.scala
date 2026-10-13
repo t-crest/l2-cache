@@ -116,10 +116,18 @@ class SharedPipelinedCacheSynthTop(
   io.reducedOut := RegNext(RegNext(Cat(coresOutReg, memOutReg, schedulerOutReg).xorR))
 }
 
+/**
+ * Generates the synthesis top level module.
+ *
+ * Arguments: [policy] [nCores]
+ *  - policy: L2 replacement policy, configured like in Patmos (repl attribute of the L2Cache element in the Patmos
+ *            configuration): plru, cont, time, lc, lcr or part (default: time)
+ *  - nCores: number of cores sharing the cache (default: 8)
+ */
 object SharedPipelinedCacheSynthTop extends App {
   val l2Size = 65536 // 64 KiB
   val nWays = 8
-  val nCores = 8
+  val nCores = if (args.length > 1) args(1).toInt else 8
   val addressWidth = 32
   val bytesPerBlock = 64
   val bytesPerSubBlock = 16
@@ -127,11 +135,18 @@ object SharedPipelinedCacheSynthTop extends App {
   val memBurstLen = 4
 
   val l2nSets = l2Size / (nWays * bytesPerBlock)
-//  val l2RepPolicy = () => new BitPlruReplacementPolicy(nWays, l2nSets, nCores)
-//  val l2RepPolicy = () => new ContentionReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, false, true, false, repSetFormat = new MruFormat)
-  val l2RepPolicy = () => new TimeoutReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, repSetFormat = new MruFormat)
+  val policy = if (args.length > 0) args(0) else "time"
+  val l2RepPolicy: () => SharedCacheReplacementPolicyType = policy match {
+    case "plru" => () => new BitPlruReplacementPolicy(nWays, l2nSets, nCores)
+    case "cont" => () => new ContentionReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, enablePrecedentEvents = true, enableWbEvents = true, enableMissInMiss = true)
+    case "time" => () => new TimeoutReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, repSetFormat = new MruFormat)
+    case "lc" => () => new LeastCriticalReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU)
+    case "lcr" => () => new LeastCriticalReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, rejectNonCritical = true)
+    case "part" => () => new CriticalWayPartitionReplacementPolicy(nWays, l2nSets, nCores)
+    case _ => throw new IllegalArgumentException(s"Unknown L2 cache replacement policy: $policy")
+  }
 
-  println("Generating the L2 cache hardware for synthesis...")
+  println(s"Generating the L2 cache hardware for synthesis with the $policy replacement policy and $nCores cores...")
   (new chisel3.stage.ChiselStage).emitVerilog(
     new SharedPipelinedCacheSynthTop(
       sizeInBytes = l2Size,
