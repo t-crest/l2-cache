@@ -29,6 +29,8 @@ POLICY_PREFIXES = {
     "lc": "lc",
     "lcr": "lcr",
     "part": "part",
+    "lcq": "lcq",
+    "partq": "partq",
 }
 
 CACHE_INSTANCE = "l2Cache"  # OcpCacheWrapper instance in the synthesis top level

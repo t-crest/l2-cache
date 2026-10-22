@@ -8,15 +8,15 @@
 
 set -euo pipefail
 
-POLICIES="plru,cont,lc,part"
+POLICIES="plru,cont,lc,part,lcq,partq"
 CORES=4
 OUT_DIR="synth-results"
 SYNTHESIZE=true
 
 function usage {
-	echo "Usage: $0 [--policies plru,cont,lc,part] [--cores 4] [--out synth-results] [--parse-only]"
+	echo "Usage: $0 [--policies plru,cont,lc,part,lcq,partq] [--cores 4] [--out synth-results] [--parse-only]"
 	echo "  --policies    Comma separated L2 replacement policies, as in the Patmos configuration: plru, cont, time,"
-	echo "                lc, lcr or part (default: $POLICIES)."
+	echo "                lc, lcr, part, lcq or partq (default: $POLICIES)."
 	echo "  --cores       Number of cores sharing the cache (default: $CORES, as in the cont-test evaluation)."
 	echo "  --out         Directory for the reports and the results (default: $OUT_DIR)."
 	echo "  --parse-only  Do not synthesize, only extract the results from the reports in the output directory."
@@ -47,8 +47,8 @@ function policy_module {
 		plru) echo BitPlruReplacementPolicy ;;
 		cont) echo ContentionReplacementPolicy ;;
 		time) echo TimeoutReplacementPolicy ;;
-		lc|lcr) echo LeastCriticalReplacementPolicy ;;
-		part) echo CriticalWayPartitionReplacementPolicy ;;
+		lc|lcr|lcq) echo LeastCriticalReplacementPolicy ;;
+		part|partq) echo CriticalWayPartitionReplacementPolicy ;;
 		*) echo "Unknown L2 replacement policy: $1" >&2; exit 1 ;;
 	esac
 }
