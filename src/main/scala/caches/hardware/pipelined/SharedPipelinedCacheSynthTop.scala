@@ -121,7 +121,7 @@ class SharedPipelinedCacheSynthTop(
  *
  * Arguments: [policy] [nCores]
  *  - policy: L2 replacement policy, configured like in Patmos (repl attribute of the L2Cache element in the Patmos
- *            configuration): plru, cont, time, lc, lcr or part (default: time)
+ *            configuration): plru, cont, time, lc, lcr, part, lcq or partq (default: time)
  *  - nCores: number of cores sharing the cache (default: 8)
  */
 object SharedPipelinedCacheSynthTop extends App {
@@ -143,6 +143,8 @@ object SharedPipelinedCacheSynthTop extends App {
     case "lc" => () => new LeastCriticalReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU)
     case "lcr" => () => new LeastCriticalReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, rejectNonCritical = true)
     case "part" => () => new CriticalWayPartitionReplacementPolicy(nWays, l2nSets, nCores)
+    case "lcq" => () => new LeastCriticalReplacementPolicy(nWays, l2nSets, nCores, BasePolicies.BIT_PLRU, priorityQueues = true)
+    case "partq" => () => new CriticalWayPartitionReplacementPolicy(nWays, l2nSets, nCores, priorityQueues = true)
     case _ => throw new IllegalArgumentException(s"Unknown L2 cache replacement policy: $policy")
   }
 
