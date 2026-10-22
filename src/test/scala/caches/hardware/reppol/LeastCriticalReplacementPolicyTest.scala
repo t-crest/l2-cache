@@ -18,41 +18,71 @@ object LeastCriticalReplacementPolicyTest {
   /** Returned instead of a way for a rejected request. */
   val Rejected = -1
 
+  /** Priority queue information of an accepted request, read in the WB stage together with the replacement way. */
+  case class QueueInfo(way: Int, isCrit: Boolean, reachedLimit: Boolean, repWayCrit: Boolean, repWayAtLimit: Boolean)
+
   /**
    * Issues the requests back-to-back, one per cycle, as the cache pipeline does: set index in cycle 0, core ID in
    * cycle 1, hit information in cycle 2, and update/evict in cycle 3, where the replacement way is read. Like the
-   * cache, a miss that the policy rejects (isValid low) neither updates the policy nor evicts a line.
+   * cache, a miss that the policy rejects (isValid low) neither updates the policy nor evicts a line, and when the
+   * policy inserts a bubble, the request in the update stage and the younger requests are held for one cycle and the
+   * WB stage is empty in the next cycle.
    *
    * @param allowReject if false, every request must be accepted
+   * @param queueInfo   if given, the priority queue information of each accepted request is appended to it
+   * @param bubbles     if given, the request held in the update stage is appended to it for each bubble
    * @return the replacement way given to each request, or Rejected
    */
-  def runPipelined(dut: PolicyTestWrapper, reqs: Seq[Req], allowReject: Boolean = false): Seq[Int] = {
+  def runPipelined(dut: PolicyTestWrapper, reqs: Seq[Req], allowReject: Boolean = false, queueInfo: Option[mutable.Buffer[QueueInfo]] = None,
+                   bubbles: Option[mutable.Buffer[Int]] = None): Seq[Int] = {
     val repWays = mutable.ArrayBuffer.fill(reqs.length)(-1)
+    val ctrl = dut.io.policy.control
+    val info = dut.io.policy.info
 
-    for (cycle <- 0 until reqs.length + 3) {
-      val ctrl = dut.io.policy.control
-      val info = dut.io.policy.info
+    // Request in each stage, None if empty: set index (cycle 0), read stage, update stage, WB stage
+    var indexStage = 0
+    var readStage: Option[Int] = None
+    var updateStage: Option[Int] = None
+    var wbStage: Option[Int] = None
+    var cycles = 0
 
-      ctrl.setIdx.poke(reqs.lift(cycle).map(_.setIdx).getOrElse(0).U)
-      ctrl.valid.poke(reqs.lift(cycle - 1).isDefined.B)
-      ctrl.coreId.poke(reqs.lift(cycle - 1).map(_.coreId).getOrElse(0).U)
-      info.isHit.poke(reqs.lift(cycle - 2).exists(_.hitWay.isDefined).B)
-      info.hitWay.poke(reqs.lift(cycle - 2).flatMap(_.hitWay).getOrElse(0).U)
+    while (indexStage < reqs.length || readStage.isDefined || updateStage.isDefined || wbStage.isDefined) {
+      ctrl.stall.poke(false.B)
+      ctrl.setIdx.poke(reqs.lift(indexStage).map(_.setIdx).getOrElse(0).U)
+      ctrl.valid.poke(readStage.isDefined.B)
+      ctrl.coreId.poke(readStage.map(reqs(_).coreId).getOrElse(0).U)
+      info.isHit.poke(updateStage.exists(reqs(_).hitWay.isDefined).B)
+      info.hitWay.poke(updateStage.flatMap(reqs(_).hitWay).getOrElse(0).U)
 
-      val wbReq = reqs.lift(cycle - 3)
-      val isHit = wbReq.exists(_.hitWay.isDefined)
-      val accepted = wbReq.isDefined && (isHit || ctrl.isValid.peekBoolean())
+      val isHit = wbStage.exists(reqs(_).hitWay.isDefined)
+      val accepted = wbStage.isDefined && (isHit || ctrl.isValid.peekBoolean())
       ctrl.update.poke(accepted.B)
       ctrl.evict.poke((accepted && !isHit).B)
-      if (wbReq.isDefined) {
-        assert(accepted || allowReject, s"Request ${cycle - 3} was rejected")
-        repWays(cycle - 3) = if (accepted) ctrl.replaceWay.peekInt().toInt else Rejected
+      wbStage.foreach { idx =>
+        assert(accepted || allowReject, s"Request $idx was rejected")
+        repWays(idx) = if (accepted) ctrl.replaceWay.peekInt().toInt else Rejected
+        if (accepted) {
+          queueInfo.foreach(_ += QueueInfo(repWays(idx), info.updateCoreIsCrit.peekBoolean(), info.updateCoreReachedLimit.peekBoolean(),
+            info.isReplacementWayCrit.peekBoolean(), info.isReplacementWayAtLimit.peekBoolean()))
+        }
       }
 
+      val bubble = ctrl.insertBubble.peekBoolean()
       dut.clock.step()
+      cycles += 1
+      assert(cycles < 10 * (reqs.length + 4), "The requests did not finish")
+
+      if (bubble) {
+        bubbles.foreach(_ += updateStage.getOrElse(-1))
+        wbStage = None
+      } else {
+        wbStage = updateStage
+        updateStage = readStage
+        readStage = if (indexStage < reqs.length) Some(indexStage) else None
+        indexStage += 1
+      }
     }
 
-    val ctrl = dut.io.policy.control
     ctrl.update.poke(false.B)
     ctrl.evict.poke(false.B)
     ctrl.valid.poke(false.B)
@@ -64,6 +94,13 @@ object LeastCriticalReplacementPolicyTest {
   /** Issues the requests one at a time, with no other request in the pipeline. */
   def runSequential(dut: PolicyTestWrapper, reqs: Seq[Req], allowReject: Boolean = false): Seq[Int] =
     reqs.flatMap(req => runPipelined(dut, Seq(req), allowReject))
+
+  /** Issues the misses one at a time and returns their priority queue information. */
+  def runSequentialQueueInfo(dut: PolicyTestWrapper, reqs: Seq[Req]): Seq[QueueInfo] = {
+    val queueInfo = mutable.ArrayBuffer[QueueInfo]()
+    reqs.foreach(req => runPipelined(dut, Seq(req), queueInfo = Some(queueInfo)))
+    queueInfo.toSeq
+  }
 }
 
 class LeastCriticalReplacementPolicyTest extends AnyFlatSpec with ChiselScalatestTester {
@@ -72,8 +109,8 @@ class LeastCriticalReplacementPolicyTest extends AnyFlatSpec with ChiselScalates
 
   val (nWays, nSets, nCores) = (4, 2, 4)
 
-  def lcPolicy(claimOnHit: Boolean = true, rejectNonCritical: Boolean = false) =
-    new PolicyTestWrapper(() => new LeastCriticalReplacementPolicy(nWays, nSets, nCores, BasePolicies.BIT_PLRU, claimOnHit, rejectNonCritical))
+  def lcPolicy(claimOnHit: Boolean = true, rejectNonCritical: Boolean = false, priorityQueues: Boolean = false) =
+    new PolicyTestWrapper(() => new LeastCriticalReplacementPolicy(nWays, nSets, nCores, BasePolicies.BIT_PLRU, claimOnHit, rejectNonCritical, priorityQueues))
 
   "LeastCriticalReplacementPolicy" should "behave like its base policy when no core is critical" in {
     test(lcPolicy()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
@@ -162,7 +199,7 @@ class LeastCriticalReplacementPolicyTest extends AnyFlatSpec with ChiselScalates
     }
   }
 
-  "LeastCriticalReplacementPolicy" should "forward line assignments to back-to-back requests" in {
+  "LeastCriticalReplacementPolicy" should "see the line assignments written by the request ahead of it" in {
     test(lcPolicy()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       setCoreAsCritical(dut, coreID = 0, wData = 1)
 
@@ -211,6 +248,33 @@ class LeastCriticalReplacementPolicyTest extends AnyFlatSpec with ChiselScalates
 
       // Core 0 takes the last non-critical way, so core 1 directly behind it must be rejected
       assert(runPipelined(dut, Seq(miss(0), miss(1)), allowReject = true) == Seq(3, Rejected))
+    }
+  }
+  "LeastCriticalReplacementPolicy" should "send critical misses and write-backs of critical lines to the priority queues" in {
+    test(lcPolicy(priorityQueues = true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      setCoreAsCritical(dut, coreID = 0, wData = 1)
+
+      // Core 0 allocates ways 0 and 1 and core 1 ways 2 and 3: only core 0's misses are prioritized, no critical line
+      // is evicted
+      assert(runSequentialQueueInfo(dut, Seq(miss(0), miss(0), miss(1), miss(1))) == Seq(
+        QueueInfo(0, isCrit = true, reachedLimit = true, repWayCrit = false, repWayAtLimit = true),
+        QueueInfo(1, isCrit = true, reachedLimit = true, repWayCrit = false, repWayAtLimit = true),
+        QueueInfo(2, isCrit = false, reachedLimit = false, repWayCrit = false, repWayAtLimit = true),
+        QueueInfo(3, isCrit = false, reachedLimit = false, repWayCrit = false, repWayAtLimit = true)))
+
+      // Core 0 takes the non-critical ways, then the set is full of critical lines and evicting one is a critical
+      // write-back, for critical and non-critical cores
+      assert(runSequentialQueueInfo(dut, Seq(miss(0), miss(0), miss(0), miss(1))).map(i => (i.reachedLimit, i.repWayCrit)) ==
+        Seq((true, false), (true, false), (true, true), (false, true)))
+    }
+  }
+
+  "LeastCriticalReplacementPolicy" should "not use the priority queues without priorityQueues" in {
+    test(lcPolicy()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      setCoreAsCritical(dut, coreID = 0, wData = 1)
+      val info = runSequentialQueueInfo(dut, Seq.fill(5)(miss(0)))
+      assert(info.forall(i => i.isCrit && !i.reachedLimit && !i.repWayAtLimit))
+      assert(!dut.pol.includeCriticalMissQ() && !dut.pol.includeCriticalWbQ())
     }
   }
 }

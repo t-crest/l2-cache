@@ -1,6 +1,7 @@
 package caches.hardware.pipelined.cache
 
 import SharedPipelinedCacheTest._
+import caches.hardware.reppol.BasePolicies
 import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
@@ -10,7 +11,7 @@ import scala.util.Random
 
 
 class SharedPipelinedCacheRandomTest extends AnyFlatSpec with ChiselScalatestTester {
-  def generateRandomTestCase(nCores: Int, maxTag: Int, maxIdx: Int, nSubBlocks: Int, bytesPerBlock: Int, bytesPerSubBlock: Int, memFile: String, setCore0Crit: Boolean = false, testActionsLen: Int = 100): Array[TestAction] = {
+  def generateRandomTestCase(nCores: Int, maxTag: Int, maxIdx: Int, nSubBlocks: Int, bytesPerBlock: Int, bytesPerSubBlock: Int, memFile: String, setCore0Crit: Boolean = false, testActionsLen: Int = 100, core0CritData: Option[Int] = None): Array[TestAction] = {
     val rand = new Random()
 
     var testActions = Array.empty[TestAction]
@@ -20,6 +21,9 @@ class SharedPipelinedCacheRandomTest extends AnyFlatSpec with ChiselScalatestTes
     if (setCore0Crit) {
       // Cannot set contention limit, since the rejection queue can lose requests
       // testActions = testActions :+ PerformSchedulerOperation(0, true, Some(5 + rand.nextInt(20)))
+
+      // Policies that never reject can set core 0 as critical
+      core0CritData.foreach(data => testActions = testActions :+ PerformSchedulerOperation(0, true, Some(data)))
     }
 
     for (i <- 0 until testActionsLen) {
@@ -164,5 +168,49 @@ class SharedPipelinedCacheRandomTest extends AnyFlatSpec with ChiselScalatestTes
 
       dut.clock.step()
     }
+  }
+  /** Random requests while core 0 is critical, for policies that never reject a request. */
+  private def runRandomCritical(cacheConfig: CacheConfiguration, core0CritData: Int): Unit = {
+    val nSubBlocks = cacheConfig.bytesPerBlock / cacheConfig.bytesPerSubBlock
+
+    val cache = generateDut(cacheConfig)
+
+    val testActions = generateRandomTestCase(
+      cacheConfig.nCores,
+      300, // Setting maximum tag to 300 since the hex file contains no data at higher tags
+      math.pow(2, cache.indexWidth).toInt,
+      nSubBlocks,
+      cacheConfig.bytesPerBlock,
+      cacheConfig.bytesPerSubBlock,
+      cacheConfig.memFile.getOrElse(""),
+      setCore0Crit = true,
+      core0CritData = Some(core0CritData)
+    )
+
+    test(cache.dutGen.apply()).withAnnotations(Seq(WriteFstAnnotation, VerilatorBackendAnnotation)) { dut =>
+      dut.clock.setTimeout(5000)
+
+      defaultAssignments(dut, cache.nCores)
+
+      performTestActions(
+        dut,
+        cache.nCores,
+        testActions,
+        cache.indexWidth,
+        cache.blockOffsetWidth,
+        cache.byteOffsetWidth,
+        3500
+      )
+
+      dut.clock.step()
+    }
+  }
+
+  it should "process random requests for least critical policy with priority queues" in {
+    runRandomCritical(CacheConfigs.config64ContMimPrecWb.copy(repPolConfig = LeastCriticalConfiguration(BasePolicies.BIT_PLRU, priorityQueues = true), repSetFormat = None), core0CritData = 1)
+  }
+
+  it should "process random requests for way partitioning policy with priority queues" in {
+    runRandomCritical(CacheConfigs.config64ContMimPrecWb.copy(repPolConfig = CriticalWayPartitionConfiguration(priorityQueues = true), repSetFormat = None), core0CritData = 6)
   }
 }

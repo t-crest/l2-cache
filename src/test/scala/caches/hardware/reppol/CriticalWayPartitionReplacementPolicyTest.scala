@@ -10,7 +10,8 @@ class CriticalWayPartitionReplacementPolicyTest extends AnyFlatSpec with ChiselS
   // Four ways: by default ways 0 and 1 are critical, ways 2 and 3 non-critical
   val (nWays, nSets, nCores) = (4, 2, 4)
 
-  def partitionPolicy() = new PolicyTestWrapper(() => new CriticalWayPartitionReplacementPolicy(nWays, nSets, nCores))
+  def partitionPolicy(priorityQueues: Boolean = false) =
+    new PolicyTestWrapper(() => new CriticalWayPartitionReplacementPolicy(nWays, nSets, nCores, priorityQueues = priorityQueues))
 
   "CriticalWayPartitionReplacementPolicy" should "use only the non-critical ways when no core is critical" in {
     test(partitionPolicy()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
@@ -80,7 +81,7 @@ class CriticalWayPartitionReplacementPolicyTest extends AnyFlatSpec with ChiselS
     }
   }
 
-  "CriticalWayPartitionReplacementPolicy" should "forward the bit PLRU state to back-to-back requests" in {
+  "CriticalWayPartitionReplacementPolicy" should "see the bit PLRU state written by the request ahead of it" in {
     test(partitionPolicy()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
       setCoreAsCritical(dut, coreID = 0, wData = 2)
 
@@ -88,6 +89,24 @@ class CriticalWayPartitionReplacementPolicyTest extends AnyFlatSpec with ChiselS
       assert(runPipelined(dut, Seq(miss(1), miss(1), miss(1), miss(1))) == Seq(2, 3, 2, 3))
       // Way 3 was used last in the non-critical partition, so core 1 continues with way 2
       assert(runPipelined(dut, Seq(miss(0), miss(1), miss(0), miss(1))) == Seq(0, 2, 1, 3))
+    }
+  }
+  "CriticalWayPartitionReplacementPolicy" should "send critical misses and write-backs of the critical partition to the priority queues" in {
+    test(partitionPolicy(priorityQueues = true)).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      setCoreAsCritical(dut, coreID = 0, wData = 2)
+
+      assert(runSequentialQueueInfo(dut, Seq(miss(0), miss(1), miss(0), miss(2))) == Seq(
+        QueueInfo(0, isCrit = true, reachedLimit = true, repWayCrit = true, repWayAtLimit = true),
+        QueueInfo(2, isCrit = false, reachedLimit = false, repWayCrit = false, repWayAtLimit = true),
+        QueueInfo(1, isCrit = true, reachedLimit = true, repWayCrit = true, repWayAtLimit = true),
+        QueueInfo(3, isCrit = false, reachedLimit = false, repWayCrit = false, repWayAtLimit = true)))
+    }
+  }
+
+  "CriticalWayPartitionReplacementPolicy" should "not use the priority queues without priorityQueues" in {
+    test(partitionPolicy()).withAnnotations(Seq(WriteVcdAnnotation)) { dut =>
+      setCoreAsCritical(dut, coreID = 0, wData = 2)
+      assert(runSequentialQueueInfo(dut, Seq(miss(0), miss(0))).forall(i => i.isCrit && !i.reachedLimit && !i.repWayAtLimit))
     }
   }
 }
